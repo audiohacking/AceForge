@@ -1,0 +1,27 @@
+{
+  "r": 32,
+  "lora_alpha": 64,
+  "target_modules": [
+    "linear_q",
+    "linear_k",
+    "linear_v",
+    "to_q",
+    "to_k",
+    "to_v",
+    "to_out.0",
+    "add_k_proj",
+    "add_v_proj",
+    "add_q_proj",
+    "to_add_out",
+    "projectors.0.0",
+    "projectors.0.2",
+    "projectors.0.4",
+    "projectors.1.0",
+    "projectors.1.2",
+    "projectors.1.4",
+    "final_layer.linear",
+    "timestep_embedder.linear_1",
+    "timestep_embedder.linear_2",
+    "t_block.1"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+	"r": 16,
+	"lora_alpha": 32,
+	"target_modules": [
+		"linear_q",
+		"linear_k",
+		"linear_v",
+		"to_q",
+		"to_k",
+		"to_v",
+		"to_out.0"
+	]
+}

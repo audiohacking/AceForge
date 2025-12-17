@@ -1,0 +1,576 @@
+/* C:\CandyDungeonMusicForge\static\cdmf.css */
+
+:root {
+  color-scheme: dark;
+  --cd-accent: #f97316;
+  --cd-text-dim: #cbd5e1;
+  --cd-border: #334155;
+}
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #020617;
+  color: #e5e7eb;
+}
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+}
+h1 {
+  font-size: 1.6rem;
+  margin-bottom: 0.25rem;
+}
+p {
+  margin-top: 0;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+/* Titlebar + gradient title (CD-style) */
+.cd-titlebar {
+  width: 100%;
+  margin: 16px 0 16px;
+  display: flex;
+  align-items: center;
+}
+
+.cd-titlewrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cd-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: clamp(20px, 2.6vw, 28px);
+  letter-spacing: 0.3px;
+
+  background: linear-gradient(
+    90deg,
+    var(--cd-accent),
+    #a855f7 35%,
+    #6366f1 65%,
+    #22d3ee
+  );
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+.cd-title:hover {
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.55);
+}
+
+.cd-alpha {
+  font-size: 12px;
+  color: var(--cd-text-dim);
+  border: 1px solid var(--cd-border);
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: auto;
+}
+
+.cd-logo {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.cd-logo img,
+.cd-logo svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+
+.card {
+  background: #020617;
+  border-radius: 16px;
+  border: 1px solid #111827;
+  padding: 16px 20px;
+  box-shadow: 0 12px 30px rgba(15,23,42,0.6);
+  margin-top: 16px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.row label {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  min-width: 120px;
+}
+.row input[type="text"],
+.row input[type="number"],
+.row textarea,
+.row select {
+  flex: 1;
+  font-size: 0.9rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #e5e7eb;
+}
+.row textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+.small {
+  font-size: 0.75rem;
+  color: #6b7280;
+  padding-bottom: 5px;
+}
+.slider-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.slider-row label {
+  min-width: 140px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+.slider-row input[type="range"] {
+  flex: 1;
+}
+.slider-row input[type="number"] {
+  width: 72px;
+}
+.btn {
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  background: #111827;
+  color: #e5e7eb;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn span.icon {
+  font-size: 0.9rem;
+}
+.btn.primary {
+  background: linear-gradient(135deg, #6366f1, #ec4899);
+  border-color: transparent;
+  color: white;
+  font-weight: 500;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.footer {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.progress-container {
+  width: 100%;
+  margin-top: 4px;
+}
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+.seek-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.seek-row input[type="range"] {
+  flex: 1;
+}
+
+.player-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.player-btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.loop-active,
+.mute-active {
+  box-shadow: 0 0 0 1px #22c55e;
+}
+
+.toast {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #022c22;
+  border: 1px solid #064e3b;
+  color: #bbf7d0;
+  white-space: pre-wrap;
+}
+.toast.error {
+  background: #450a0a;
+  border-color: #b91c1c;
+  color: #fecaca;
+}
+
+.track-list-panel {
+  max-height: 200px;
+  border-radius: 0 0 8px 8px;
+  border: 1px solid #1f2937;
+  border-top: none;
+  background: #020617;
+  padding: 4px 4px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+}
+.track-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.track-row:hover {
+  background: #030712;
+}
+.track-row.active {
+  background: #111827;
+}
+.track-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.track-star-cell {
+  flex: 0 0 20px;
+  justify-content: center;
+}
+.track-cell-name {
+  flex: 1 1 40%;
+}
+.track-cell-length {
+  flex: 0 0 52px;
+  justify-content: flex-end;
+}
+.track-cell-category {
+  flex: 0 0 120px;
+  margin-right: 6px;
+}
+.track-cell-created {
+  flex: 0 0 140px;
+  font-variant-numeric: tabular-nums;
+  color: #9ca3af;
+  margin-right: 8px;
+}
+.track-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.track-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-meta {
+  font-size: 0.7rem;
+  color: #6b7280;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.track-length {
+  opacity: 0.9;
+}
+.track-category {
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  background: #020617;
+}
+.track-category-empty {
+  border-style: dashed;
+  color: #6b7280;
+  font-style: italic;
+}
+.track-created {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 40px;
+  justify-content: flex-end;
+}
+.track-fav-btn,
+.track-delete-btn {
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+.track-fav-btn.favorited {
+  color: #facc15;
+}
+.track-delete-btn:hover {
+  background: #450a0a;
+  color: #fecaca;
+}
+.track-fav-btn:hover {
+  background: #1f2937;
+}
+.track-rename-btn {
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  margin-right: 4px;
+}
+.track-rename-btn:hover {
+  background: #1f2937;
+  color: #e5e7eb;
+}
+.track-select-hidden {
+  display: none;
+}
+.track-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: space-between;
+}
+.category-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.category-chip {
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #9ca3af;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.category-chip.active {
+  background: #111827;
+  color: #e5e7eb;
+  border-color: #4b5563;
+}
+.track-list-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid #1f2937;
+  border-bottom: 1px solid #111827;
+  background: #030712;
+  font-size: 0.7rem;
+  color: #9ca3af;
+}
+.track-header-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-header-fav {
+  flex: 0 0 auto;
+  width: 20px;
+  justify-content: center;
+}
+.track-header-name {
+  flex: 1 1 40%;
+}
+.track-header-length {
+  flex: 0 0 52px;
+  justify-content: center;
+  margin-right: 6px;
+}
+.track-header-category {
+  flex: 0 0 120px;
+}
+.track-header-created {
+  flex: 0 0 140px;
+}
+.track-header-actions {
+  flex: 0 0 32px;
+}
+.track-list-header button.track-header-cell {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.track-list-header button.track-header-cell.sort-active {
+  color: #e5e7eb;
+}
+.details-panel {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #030712;
+  border: 1px solid #111827;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  white-space: pre-wrap;
+}
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.card-header-row h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.preset-buttons .btn {
+  flex: 1 1 calc(100% / 7 - 6px);
+  justify-content: center;
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.loading-bar {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #020617;
+  border: 1px solid #1f2937;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateY(2px);
+}
+.loading-bar-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0%;
+  background: linear-gradient(
+    90deg,
+    #ec4899,
+    #6366f1,
+    #22c55e,
+    #eab308,
+    #ec4899
+  );
+  background-size: 200% 100%;
+  transform-origin: left center;
+  animation: none;
+}
+.loading-bar.active .loading-bar-inner {
+  animation: candy-loading-stripe 1.1s linear infinite;
+}
+
+.row.row-progress > label {
+  display: none;
+}
+
+.row-progress-body {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+@keyframes candy-loading-stripe {
+  0%   { background-position:   0% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes cdmf-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+#lyrics {
+  min-height: 160px; /* tweak up/down to taste */
+}
+
+/* Core / Advanced tabs --------------------------------------------------- */
+
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
+.tab-btn {
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #9ca3af;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.tab-btn-active {
+  background: #111827;
+  color: #e5e7eb;
+  border-color: #4b5563;
+}
+
+.tab-hint {
+  margin-bottom: 6px;
+}
+
+/* Small checkbox cluster for ERG / audio2audio toggles ------------------- */
+
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}

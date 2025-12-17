@@ -1,0 +1,32 @@
+This file documents modifications made by David M. Hagar to the
+ACE-Step project (https://github.com/ace-step/ACE-Step), which is
+licensed under the Apache License, Version 2.0.
+
+The original license text for ACE-Step is included as LICENSE.txt
+in this directory. The following files have been modified and are
+distributed in this application in modified form:
+
+Original: trainer.py 
+CDMF version: cdmf_trainer.py
+Changes:
+	Altered to force single-process when user is on 1 GPU / 1 node. This prevents Lightning from trying to initiate NCCL.
+	Altered to remove DDP checks from plot_stop that were causing training to explode on a single GPU session.
+	Added debug steps to SSL feature extraction during preprocessing to investigate training hangs (in training_step() and preprocess()).
+	Changed train_dataloader to set persistent_workers=true when num_workers >0.
+	Changed the training pipeline to feed in a ~20 second max audio segment (max_audio_seconds) and also control the number of training epochs per session.
+	Added an ssl_coeff knob to the pipeline to allow for turning off SSL when constructing (ssl_coeff=0.0).
+	Changed default knob settings at the end of script. Training is no longer limited by max_steps (as 2 million steps was insane), but by number of epochs. Default 20, configurable via exposed UI knob in CDMF.
+	Checkpointing was removed because it has a tendency to blow up memory on consumer-grade machines (including mine). 
+	An "instrumental only" toggle was added to the LightningModule pipeline which enables filtering out of any speaking/vocal-related layers that would be passed in via config files.
+	Completely nuked diffusion previews in run_step. They were causing repetitive errors after step 2000 as soon as plot_step was invoked inside the training closure and messing with the autograd state. They are not really needed for training LoRAs anyway. For now a commented-out version of the script with diffusion previews still included is retained for later testing.
+
+Original: text2music_dataset.py
+CDMF version: cdmf_text2music_dataset.py
+Changes: 
+	Changed how lang_segment is initialized, and a helper (_ensure_lang_segment) was added for the get_lang function to allow lazy-creating of LangSegments inside each worker during __init__. Without doing this setting num_workers > 0 will blow up on Windows.
+	Altered script so that a random n-second (user-defined via UI) segment of each input track is selected.
+	
+Original: pipeline_ace_step.py 
+CDMF version: cdmf_pipeline_ace_step.py
+Changes:
+  	load_lora() was altered to allow for smarter/safer loading out of custom_lora subdir.

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Starting Candy Dungeon Music Forge…</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #111827 0, #020617 55%, #020617 100%);
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .shell {
+      text-align: center;
+      padding: 24px 28px;
+      border-radius: 16px;
+      border: 1px solid #111827;
+      background: rgba(2, 6, 23, 0.95);
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.8);
+      max-width: 420px;
+      width: 100%;
+    }
+    .logo {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 12px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.2rem;
+    }
+    p {
+      margin: 0 0 14px;
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+    .bar {
+      position: relative;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #020617;
+      border: 1px solid #1f2937;
+      overflow: hidden;
+      margin: 8px 0 4px;
+    }
+    .bar-inner {
+      position: absolute;
+      inset: 0;
+      transform-origin: left center;
+      background: linear-gradient(
+        90deg,
+        #ec4899,
+        #6366f1,
+        #22c55e,
+        #eab308,
+        #ec4899
+      );
+      background-size: 200% 100%;
+      animation: candy-stripe 1.1s linear infinite;
+    }
+    .status {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      opacity: 0.9;
+    }
+    .hint {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-top: 6px;
+    }
+    @keyframes candy-stripe {
+      0%   { transform: scaleX(0.15); background-position:   0% 0; }
+      50%  { transform: scaleX(0.85); background-position: -100% 0; }
+      100% { transform: scaleX(1.0);  background-position: -200% 0; }
+    }
+  </style>
+
+  <script>
+    const APP_URL = "http://127.0.0.1:5056/";
+
+    const statusMessages = [
+  "Booting candy-powered audio engines…",
+  "Retuning spectral resonators…",
+  "Aligning neon phase channels…",
+  "Loading ACE-Step incantations…",
+  "Infusing tracks with extra sugar…",
+  "Negotiating with the riff spirits…",
+  "Warming GPU cauldrons…",
+  "Reticulating waveforms…",
+  "Polishing pixel-perfect spectrograms…",
+
+  "Quantizing chiptune crystals…",
+  "Syncing beat runes with tempo sigils…",
+  "Compiling procedurally generated melodies…",
+  "Summoning 16-bit snowfield ambience…",
+  "Buffing basslines to +3 thump…",
+  "Casting reverb of extraordinary depth…",
+  "Feeding prompts to the music gremlins…",
+  "Stabilizing crossfaded time streams…",
+  "Teaching ACE-Step new dungeon songs…",
+
+  "Charging neon mana capacitors…",
+  "Calibrating candy-coated oscillators…",
+  "Fusing lofi dust with synth shimmer…",
+  "Patching stereo portals into the void…",
+  "Deploying spectral anti-jank filters…",
+  "Spinning up infinite loop crystals…",
+  "Tuning pixel-art vinyl grooves…",
+  "Sculpting waveforms with RGB chisels…",
+  "Wrapping beats in shimmer enchantments…",
+
+  "Whispering key signatures to the model…",
+  "Encrypting melodies with sugarcane ciphers…",
+  "Cooling overheated chorus dragons…",
+  "Whittling silence into playable space…",
+  "Pruning stray off-beat goblins…",
+  "Aligning dungeon acoustics with moon phase…",
+  "Lubricating pan knobs with synth oil…",
+  "Sharpening transient-killing daggers…",
+  "Polishing dungeon echo chambers…",
+
+  "Rewiring chorus units for extra sparkle…",
+  "Packing delay lines with spectral sprinkles…",
+  "Mapping prompts onto harmonic ley lines…",
+  "Brewing coffee for the GPU familiars…",
+  "Spinning up parallel riff dimensions…",
+  "Handshaking with the Hugging Face oracles…",
+  "Checking licenses with the music council…",
+  "Teaching skeleton drummers to stay on tempo…",
+  "Converting dungeon fog into reverb tails…",
+
+  "Harvesting melodies from the dream cache…",
+  "Synchronizing beat crystals across shards…",
+  "Charmingly overfitting to your vibe…",
+  "Routing basslines through subterranean tunnels…",
+  "Rebalancing the candy–signal ratio…",
+  "Grooming arpeggios for public performance…",
+  "Distilling prompts into pure groove essence…",
+  "Soft-clipping rogue frequencies…",
+  "Rolling for crit on melodic inspiration…",
+
+  "Indexing presets in the spellbook…",
+  "Untangling chorus vines from the waveform…",
+  "Bribing the RNG with extra sprinkles…",
+  "Conjuring pixel snow for the outro…",
+  "Reinforcing loop seams with magic glue…",
+  "Teaching the model not to sing (probably)…",
+  "Widening stereo fields with prism magic…",
+  "Reattaching loose kick drums…",
+  "Sanitizing prompts for eldritch harmonies…"
+    ];
+
+    function startStatusCycler() {
+      const el = document.getElementById("status-line");
+      if (!el) return;
+
+      let index = 0;
+      el.textContent = statusMessages[index];
+
+      setInterval(() => {
+        index = (index + 1) % statusMessages.length;
+        el.textContent = statusMessages[index];
+      }, 2200);
+    }
+
+    function pollServer() {
+      // From file:// origin, CORS makes the Response opaque, but:
+      // - Network errors (server not listening) cause fetch() to REJECT.
+      // - Once the server is reachable, fetch() RESOLVES.
+      // So just "resolve = server is up", no need to inspect status.
+      fetch(APP_URL + "healthz?ts=" + Date.now(), { cache: "no-store" })
+        .then(function () {
+          // Server responded: jump straight into the app.
+          window.location.replace(APP_URL);
+        })
+        .catch(function () {
+          // Still starting up; try again shortly.
+          setTimeout(pollServer, 800);
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      startStatusCycler();
+      pollServer();
+    });
+  </script>
+</head>
+<body>
+  <div class="shell">
+    <img
+      class="logo"
+      src="cdmf_logo_new.png"
+      alt="Candy Dungeon Music Forge logo"
+    >
+    <h1>Warming up the forge…</h1>
+    <p>Your local Candy Dungeon Music Forge is starting.</p>
+    <div class="bar">
+      <div class="bar-inner"></div>
+    </div>
+    <div class="status" id="status-line">
+      Preparing audio cauldrons…
+    </div>
+    <div class="hint"><br><br>
+      First launch can take a while (installing Python packages).
+      If this screen hangs for a long time, check the console window for errors.<br><br>
+			Note: After first-time bootup, you will need to download the ACE-Step models (7+ GB).
+    </div>
+  </div>
+</body>
+</html>

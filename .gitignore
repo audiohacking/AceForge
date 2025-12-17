@@ -1,0 +1,76 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ---- Virtual envs ----
+venv_ace/
+.venv/
+venv/
+env/
+ENV/
+
+# ---- CDMF runtime-heavy / user data (DO NOT COMMIT) ----
+models/*
+ace_models/*
+ace_training/*
+custom_lora/*
+generated/*
+training_datasets/*
+build_cdmf_distro.bat
+build_cdmf_distro.ps1
+
+# Allow placeholder docs if you want to keep folder structure in-repo
+!ace_models/.gitkeep
+!ace_models/README.md
+!ace_models/ACE_STEP_CHANGES.txt
+!ace_models/LICENSE.txt
+!ace_training/.gitkeep
+!ace_training/README.md
+!custom_lora/.gitkeep
+!custom_lora/README.md
+!generated/.gitkeep
+!generated/README.md
+!training_datasets/.gitkeep
+!training_datasets/README.md
+
+# ---- Embedded Python (packaging/runtime dependency; keep out of source repo) ----
+python_embed/*
+
+# Allow a small note file if you want
+!python_embed/README.md
+!python_embed/.gitkeep
+
+# ---- Distro / installer staging outputs ----
+CDMF_Distro/
+dist/
+build/
+out/
+release/
+
+# ---- Minification / tooling caches ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- OS / editor noise ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.vscode/
+.idea/
+
+# ---- Logs ----
+*.log
+
+# ---- Secrets / env ----
+.env
+.env.*
+*.key
+*.pem
+*.pfx
+
+# ---- Optional: keep binaries out of source control ----
+CDMF.exe
