@@ -33,7 +33,9 @@ import os
 from cdmf_pipeline_ace_step import ACEStepPipeline
 
 matplotlib.use("Agg")
-torch.backends.cudnn.benchmark = False
+# Configure CUDA backends if available
+if torch.cuda.is_available():
+    torch.backends.cudnn.benchmark = False
 torch.set_float32_matmul_precision("high")
 
 
@@ -472,7 +474,9 @@ class Pipeline(LightningModule):
                 f"[preprocess] SSL ENABLED (ssl_coeff={self.ssl_coeff}); "
                 "running MERT/mHuBERT"
             )
-            with torch.amp.autocast(device_type="cuda", dtype=dtype):
+            # Use device-agnostic autocast - get device type from tensor device
+            device_type = device.type if device.type in ["cuda", "cpu", "mps"] else "cpu"
+            with torch.amp.autocast(device_type=device_type, dtype=dtype):
                 mert_ssl_hidden_states = self.infer_mert_ssl(
                     target_wavs, wav_lengths
                 )

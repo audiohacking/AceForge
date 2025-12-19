@@ -1,6 +1,6 @@
 # Candy Dungeon Music Forge (CDMF)
 
-Candy Dungeon Music Forge (CDMF) is a **local-first AI music workstation for Windows**. It runs on your PC, uses your GPU, and keeps your prompts and audio on your hardware. CDMF is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
+Candy Dungeon Music Forge (CDMF) is a **local-first AI music workstation for Windows and macOS**. It runs on your PC or Mac, uses your GPU (NVIDIA CUDA or Apple Metal), and keeps your prompts and audio on your hardware. CDMF is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
 
 Status: **v0.1**
 
@@ -17,6 +17,8 @@ Status: **v0.1**
 
 ## System requirements
 
+### Windows
+
 Minimum:
 - Windows 10/11 (64-bit)
 - NVIDIA GPU (RTX strongly recommended)
@@ -29,7 +31,26 @@ Comfortable:
 - Fast NVMe SSD
 - Comfort reading console logs when something goes wrong
 
-## Install and run (recommended)
+### macOS
+
+Minimum:
+- macOS 12.0 (Monterey) or later
+- Apple Silicon (M1/M2/M3) or Intel Mac with AMD GPU
+- 16 GB unified memory (for Apple Silicon) or 16 GB RAM
+- ~10–12 GB VRAM/unified memory (more = more headroom)
+- SSD with tens of GB free (models + audio + datasets)
+
+Comfortable:
+- Apple Silicon M1 Pro/Max/Ultra, M2 Pro/Max/Ultra, or M3 Pro/Max
+- 32 GB+ unified memory
+- Fast SSD
+- Comfort reading terminal logs when something goes wrong
+
+**Note:** Apple Metal (MPS) support enables GPU acceleration on both Apple Silicon and Intel Macs with compatible AMD GPUs. Performance is optimized for Apple Silicon.
+
+## Install and run
+
+### Windows (recommended)
 
 1. Download the latest release (installer)
 2. Run `CandyDungeonMusicForge-Setup.exe`
@@ -37,6 +58,37 @@ Comfortable:
 
 Default install location:
 - `%LOCALAPPDATA%\CandyDungeonMusicForge`
+
+### macOS
+
+1. Ensure you have Python 3.10 or later installed:
+   ```bash
+   # Check Python version
+   python3 --version
+   
+   # If not installed, install via Homebrew
+   brew install python@3.10
+   ```
+
+2. Clone or download this repository
+
+3. Navigate to the CDMF directory and run the launcher:
+   ```bash
+   cd /path/to/CDMF-Fork
+   ./CDMF.sh
+   ```
+
+4. On first run, the script will:
+   - Create a Python virtual environment (`venv_ace`)
+   - Install packages from `requirements_ace_macos.txt`
+   - Download ACE-Step and related models as needed
+   - Install helpers like `audio-separator`
+   - Open the UI in your default browser
+
+**Note:** You may need to make the script executable:
+```bash
+chmod +x CDMF.sh
+```
 
 ### First launch notes
 
@@ -108,12 +160,42 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 
 ## Troubleshooting
 
+### General Issues
+
 - **First launch takes forever**: check console for pip/model download errors; verify disk space and network
 - **No .wav files found**: generate a track; confirm Output Directory matches the Music Player folder
+
+### Windows-Specific
+
 - **CUDA / VRAM OOM**:
   - Reduce target length during generation
   - Reduce max clip seconds during training
   - Lower batch/grad accumulation if you changed them
+
+### macOS-Specific
+
+- **MPS (Metal) backend errors**: 
+  - Ensure you're running macOS 12.0+ for MPS support
+  - Some operations may fall back to CPU if not yet supported on MPS
+  - Try setting `ACE_PIPELINE_DTYPE=float32` environment variable if you encounter precision issues
+
+- **Python version issues**:
+  ```bash
+  # Ensure you have Python 3.10 or later
+  python3 --version
+  
+  # Install via Homebrew if needed
+  brew install python@3.10
+  ```
+
+- **Permission denied when running CDMF.sh**:
+  ```bash
+  chmod +x CDMF.sh
+  ```
+
+- **Browser doesn't open automatically**: 
+  - Manually navigate to `http://127.0.0.1:5056/` in your browser
+  - Check if the terminal shows any error messages
 
 ## Contributing
 

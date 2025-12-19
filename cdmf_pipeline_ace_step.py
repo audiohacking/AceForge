@@ -50,10 +50,12 @@ import torchaudio
 from acestep.cpu_offload import cpu_offload
 
 
-torch.backends.cudnn.benchmark = False
+# Configure CUDA backends if available
+if torch.cuda.is_available():
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cuda.matmul.allow_tf32 = True
 torch.set_float32_matmul_precision("high")
-torch.backends.cudnn.deterministic = True
-torch.backends.cuda.matmul.allow_tf32 = True
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
@@ -141,14 +143,20 @@ class ACEStepPipeline:
 
     def cleanup_memory(self):
         """Clean up GPU and CPU memory to prevent VRAM overflow during multiple generations."""
-        # Clear CUDA cache
-        if torch.cuda.is_available():
+        # Clear device cache based on device type
+        if torch.cuda.is_available() and self.device.type == "cuda":
             torch.cuda.empty_cache()
-
             # Log memory usage if in verbose mode
             allocated = torch.cuda.memory_allocated() / (1024 ** 3)
             reserved = torch.cuda.memory_reserved() / (1024 ** 3)
             logger.info(f"GPU Memory: {allocated:.2f}GB allocated, {reserved:.2f}GB reserved")
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available() and self.device.type == "mps":
+            # MPS (Metal Performance Shaders) cache clearing
+            try:
+                torch.mps.empty_cache()
+                logger.info("MPS Memory cache cleared")
+            except Exception as e:
+                logger.debug(f"MPS cache clear not available: {e}")
 
         # Collect Python garbage
         import gc
