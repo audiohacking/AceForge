@@ -39,7 +39,21 @@ Status: **v0.1-macos**
 
 ## Install and run
 
-### Prerequisites
+### Option 1: Download Pre-built Release (Easiest)
+
+**Coming Soon!** Pre-built macOS application bundles will be available from the [Releases page](https://github.com/audiohacking/CDMF-Fork/releases).
+
+1. Download `CandyDungeonMusicForge-macOS.dmg` from the latest release
+2. Open the DMG file
+3. Drag `CandyDungeonMusicForge.app` to your Applications folder
+4. Right-click the app and select "Open" (first time only, to bypass Gatekeeper)
+5. The application will start and open in your browser
+
+**Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically.
+
+### Option 2: Run from Source
+
+#### Prerequisites
 
 Ensure you have Python 3.10 or later installed:
 ```bash
@@ -50,7 +64,7 @@ python3 --version
 brew install python@3.10
 ```
 
-### Installation
+#### Installation
 
 1. Clone this repository:
    ```bash
@@ -76,8 +90,6 @@ brew install python@3.10
    - Open the UI in your default browser
 
 The terminal window must remain open while CDMF is running. Press Ctrl+C to stop the server.
-
-### First launch notes
 
 On first run, CDMF does real setup work:
 - Creates a Python virtual environment (e.g. `venv_ace`)
@@ -228,6 +240,56 @@ Key files for cross-platform compatibility:
 - `cdmf_pipeline_ace_step.py` - Device selection and memory management
 - `cdmf_trainer.py` - Training with device-agnostic autocast
 - `music_forge_ui.py` - Browser opening logic
+
+## Building Releases
+
+Pre-built macOS application bundles are automatically created via GitHub Actions. To build locally or create a new release:
+
+### Automated Build (GitHub Actions)
+
+1. Create a new release on GitHub
+2. The build workflow will automatically trigger
+3. DMG and ZIP files will be attached to the release
+
+Or manually trigger the build:
+```bash
+# Via GitHub Actions UI:
+# Go to Actions > Build macOS Release > Run workflow
+```
+
+### Manual Build (Local)
+
+Requirements:
+- macOS system with Python 3.10+
+- All dependencies installed (`requirements_ace_macos.txt`)
+
+Steps:
+```bash
+# Install dependencies
+pip install -r requirements_ace_macos.txt
+pip install "audio-separator==0.40.0" --no-deps
+pip install "py3langid==0.3.0" --no-deps
+pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
+
+# Build with PyInstaller
+pyinstaller CDMF.spec
+
+# The .app bundle will be in dist/CandyDungeonMusicForge.app
+
+# Optional: Create DMG
+hdiutil create -volname "CandyDungeonMusicForge" \
+  -srcfolder dist/CandyDungeonMusicForge.app \
+  -ov -format UDZO \
+  CandyDungeonMusicForge-macOS.dmg
+```
+
+The build process creates a self-contained macOS application that includes:
+- Python runtime and all dependencies
+- Static files (HTML, CSS, JS)
+- Configuration files
+- Documentation
+
+**Note:** The app bundle does NOT include the large AI model files (~several GB). These are downloaded automatically on first run.
 
 ## Contributing
 

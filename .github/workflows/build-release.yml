@@ -1,0 +1,136 @@
+name: Build macOS Release
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.1.0)'
+        required: true
+        default: 'v0.1.0-macos'
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS Application
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Display Python version
+      run: python --version
+      
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements_ace_macos.txt
+        
+    - name: Install audio-separator (no deps)
+      run: |
+        pip install "audio-separator==0.40.0" --no-deps
+        
+    - name: Install py3langid (no deps)
+      run: |
+        pip install "py3langid==0.3.0" --no-deps
+        
+    - name: Install ACE-Step (no deps)
+      run: |
+        pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
+        
+    - name: Install PyInstaller
+      run: |
+        pip install pyinstaller==6.17.0
+        
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller CDMF.spec
+        
+    - name: Create DMG (macOS disk image)
+      run: |
+        # Create a temporary directory for DMG contents
+        mkdir -p dmg_temp
+        cp -R dist/CandyDungeonMusicForge.app dmg_temp/
+        
+        # Create Applications symlink for easy drag-and-drop install
+        ln -s /Applications dmg_temp/Applications
+        
+        # Create README for users
+        cat > dmg_temp/README.txt << 'EOF'
+        Candy Dungeon Music Forge - macOS Edition
+        ==========================================
+        
+        Installation:
+        1. Drag "CandyDungeonMusicForge.app" to the Applications folder
+        2. Open Finder and go to Applications
+        3. Right-click "CandyDungeonMusicForge.app" and select "Open"
+        4. Click "Open" in the security dialog (first run only)
+        
+        Note: On first launch, you may need to allow the app in:
+        System Preferences > Security & Privacy > General
+        
+        System Requirements:
+        - macOS 12.0 (Monterey) or later
+        - Apple Silicon (M1/M2/M3) or Intel Mac
+        - 16 GB RAM recommended
+        - Internet connection for model downloads
+        
+        For more information, visit:
+        https://github.com/audiohacking/CDMF-Fork
+        EOF
+        
+        # Create DMG
+        hdiutil create -volname "CandyDungeonMusicForge" \
+          -srcfolder dmg_temp \
+          -ov -format UDZO \
+          CandyDungeonMusicForge-macOS.dmg
+          
+    - name: Create ZIP archive (alternative distribution)
+      run: |
+        cd dist
+        zip -r ../CandyDungeonMusicForge-macOS.zip CandyDungeonMusicForge.app
+        cd ..
+        
+    - name: Calculate checksums
+      run: |
+        shasum -a 256 CandyDungeonMusicForge-macOS.dmg > checksums.txt
+        shasum -a 256 CandyDungeonMusicForge-macOS.zip >> checksums.txt
+        cat checksums.txt
+        
+    - name: Upload DMG artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CandyDungeonMusicForge-macOS-DMG
+        path: CandyDungeonMusicForge-macOS.dmg
+        
+    - name: Upload ZIP artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CandyDungeonMusicForge-macOS-ZIP
+        path: CandyDungeonMusicForge-macOS.zip
+        
+    - name: Upload checksums
+      uses: actions/upload-artifact@v4
+      with:
+        name: checksums
+        path: checksums.txt
+        
+    - name: Upload to Release (if triggered by release)
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          CandyDungeonMusicForge-macOS.dmg
+          CandyDungeonMusicForge-macOS.zip
+          checksums.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

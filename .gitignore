@@ -47,6 +47,13 @@ dist/
 build/
 out/
 release/
+*.dmg
+*.app
+*.spec.bak
+
+# ---- PyInstaller ----
+*.pyc
+__pycache__/
 
 # ---- Minification / tooling caches ----
 node_modules/
