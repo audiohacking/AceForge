@@ -1,4 +1,6 @@
-# AceForge - macOS Edition
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/a00aec1a-1204-49b6-84df-36fd7ccbf523" />
+
+# AceForge
 
 AceForge is a **local-first AI music workstation for macOS**. It runs on your Mac, uses Apple Metal (MPS) GPU acceleration, and keeps your prompts and audio on your hardware. AceForge is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
 
