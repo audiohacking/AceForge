@@ -9,7 +9,7 @@ from huggingface_hub import snapshot_download
 # Hugging Face repo for MuFun-ACEStep
 MUFUN_REPO_ID = "Yi3852/MuFun-ACEStep"
 
-# Local cache root for MuFun under the Candy Dungeon Music Forge app directory.
+# Local cache root for MuFun under the AceForge app directory.
 # Layout will look like:
 #   models/mufun_acestep/
 #     blobs/
@@ -304,7 +304,7 @@ def _load_mufun_model() -> Tuple[Any, Any, str]:
     except ImportError as exc:
         raise RuntimeError(
             "MuFun-ACEStep support requires 'transformers' and 'torch' to be "
-            "installed in the Candy Dungeon Music Forge virtual environment."
+            "installed in the AceForge virtual environment."
         ) from exc
 
     # Make sure the snapshot exists first (cheap no-op if already present),

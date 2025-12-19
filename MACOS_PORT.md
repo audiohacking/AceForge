@@ -1,6 +1,6 @@
 # macOS Port Documentation
 
-This document describes the macOS port of Candy Dungeon Music Forge and provides guidance for maintaining and updating this fork.
+This document describes the macOS port of AceForge and provides guidance for maintaining and updating this fork.
 
 ## Overview
 

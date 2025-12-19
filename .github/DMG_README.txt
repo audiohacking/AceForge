@@ -1,10 +1,10 @@
-Candy Dungeon Music Forge - macOS Edition
-==========================================
+AceForge - macOS Edition
+========================
 
 Installation:
-1. Drag "CandyDungeonMusicForge.app" to the Applications folder
+1. Drag "AceForge.app" to the Applications folder
 2. Open Finder and go to Applications
-3. Right-click "CandyDungeonMusicForge.app" and select "Open"
+3. Right-click "AceForge.app" and select "Open"
 4. Click "Open" in the security dialog (first run only)
 
 Note: On first launch, you may need to allow the app in:

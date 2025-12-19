@@ -1,4 +1,4 @@
-# C:\CandyDungeonMusicForge\cdmf_generation.py
+# C:\AceForge\cdmf_generation.py
 
 from __future__ import annotations
 
@@ -172,7 +172,7 @@ def create_generation_blueprint(
 
         try:
             print(
-                "[Candy Music Forge] GENERATE request\n"
+                "[AceForge] GENERATE request\n"
                 f"  Prompt:          {prompt!r}\n"
                 "  Negative prompt: (disabled / empty)",
                 flush=True,
@@ -335,14 +335,14 @@ def create_generation_blueprint(
                             if existing_hash == new_hash:
                                 reused_adapter_path = str(adapter_dir)
                                 print(
-                                    "[Candy Music Forge] Uploaded LoRA matches existing "
+                                    "[AceForge] Uploaded LoRA matches existing "
                                     f"adapter; reusing {adapter_dir}",
                                     flush=True,
                                 )
                                 break
                 except Exception as e:
                     print(
-                        "[Candy Music Forge] WARNING: failed to hash uploaded LoRA for "
+                        "[AceForge] WARNING: failed to hash uploaded LoRA for "
                         f"deduplication: {e}",
                         flush=True,
                     )
@@ -363,12 +363,12 @@ def create_generation_blueprint(
                         uploaded_lora.save(str(lora_path))
                         lora_name_or_path = str(adapter_dir)
                         print(
-                            f"[Candy Music Forge] Saved uploaded LoRA weights to {lora_path}",
+                            f"[AceForge] Saved uploaded LoRA weights to {lora_path}",
                             flush=True,
                         )
                     except Exception as e:
                         print(
-                            f"[Candy Music Forge] WARNING: failed to save uploaded LoRA "
+                            f"[AceForge] WARNING: failed to save uploaded LoRA "
                             f"weights {uploaded_lora.filename}: {e}",
                             flush=True,
                         )
@@ -444,7 +444,7 @@ def create_generation_blueprint(
                         src_audio_path = str(wav_path)
                     except Exception as e:
                         print(
-                            f"[Candy Music Forge] Warning: failed to convert ref audio "
+                            f"[AceForge] Warning: failed to convert ref audio "
                             f"{tmp_path} to WAV: {e}",
                             flush=True,
                         )
@@ -584,7 +584,7 @@ def create_generation_blueprint(
             except Exception as e:
                 safe_name = getattr(wav_path, "name", repr(wav_path))
                 print(
-                    f"[Candy Music Forge] Failed to update track metadata for {safe_name}: {e}",
+                    f"[AceForge] Failed to update track metadata for {safe_name}: {e}",
                     flush=True,
                 )
 
@@ -839,7 +839,7 @@ def create_generation_blueprint(
             )
         except Exception as exc:
             print(
-                "[Candy Music Forge] Error during prompt/lyrics generation:",
+                "[AceForge] Error during prompt/lyrics generation:",
                 exc,
                 flush=True,
             )

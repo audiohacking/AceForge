@@ -1,4 +1,4 @@
-# C:\CandyDungeonMusicForge\music_forge_ui.py
+# C:\AceForge\music_forge_ui.py
 
 from __future__ import annotations
 
@@ -22,20 +22,20 @@ try:
             )
             _cdmf_dl.FromSingleFileMixin = _CDMF_FSM  # type: ignore[attr-defined]
             print(
-                "[Candy Music Forge] Early-patched diffusers.loaders.FromSingleFileMixin "
+                "[AceForge] Early-patched diffusers.loaders.FromSingleFileMixin "
                 "for ace-step.",
                 flush=True,
             )
         except Exception as _e:
             print(
-                "[Candy Music Forge] WARNING: Could not expose "
+                "[AceForge] WARNING: Could not expose "
                 "diffusers.loaders.FromSingleFileMixin early: "
                 f"{_e}",
                 flush=True,
             )
 except Exception as _e:
     print(
-        "[Candy Music Forge] WARNING: Failed to import diffusers.loaders "
+        "[AceForge] WARNING: Failed to import diffusers.loaders "
         f"for early compatibility patch: {_e}",
         flush=True,
     )
@@ -157,7 +157,7 @@ def main() -> None:
                 )
 
     print(
-        "Starting Candy Dungeon Music Forge (ACE-Step Edition v0.1) "
+        "Starting AceForge (ACE-Step Edition v0.1) "
         "on http://127.0.0.1:5056/ ...",
         flush=True,
     )
@@ -179,7 +179,7 @@ def main() -> None:
                 webbrowser.open("http://127.0.0.1:5056/")
         except Exception as e:
             print(
-                f"[Candy Music Forge] Failed to open browser automatically: {e}",
+                f"[AceForge] Failed to open browser automatically: {e}",
                 flush=True,
             )
             try:

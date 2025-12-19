@@ -1,4 +1,4 @@
-# Candy Dungeon Music Forge - macOS Requirements
+# AceForge - macOS Requirements
 # This file contains dependencies for running CDMF on macOS with Apple Metal (MPS) support
 # Windows-specific packages (pywin32-ctypes, win32_setctime) have been removed
 

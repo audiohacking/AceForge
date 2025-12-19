@@ -1,4 +1,4 @@
-# Candy Dungeon Music Forge - Windows Requirements (REFERENCE ONLY)
+# AceForge - Windows Requirements (REFERENCE ONLY)
 # This is the original Windows requirements file, preserved for reference when porting updates from upstream
 # This macOS fork uses requirements_ace_macos.txt instead
 # Windows-specific packages: pywin32-ctypes, win32_setctime

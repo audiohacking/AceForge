@@ -1,6 +1,6 @@
-# C:\CandyDungeonMusicForge\cdmf_template.py
+# C:\AceForge\cdmf_template.py
 #
-# HTML template for Candy Dungeon Music Forge.
+# HTML template for AceForge.
 # Refactored so CSS/JS live in static files instead of a giant inline blob.
 
 HTML = r"""
@@ -8,7 +8,7 @@ HTML = r"""
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Candy Dungeon Music Forge (v0.1)</title>
+  <title>AceForge (v0.1)</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='cdmf_logo_new.png') }}">
 
   <!-- External CSS instead of inline <style> -->
@@ -22,11 +22,11 @@ HTML = r"""
         <span class="cd-logo">
           <img
             src="{{ url_for('static', filename='cdmf_logo_new.png') }}"
-            alt="Candy Dungeon Music Forge logo"
+            alt="AceForge logo"
           >
         </span>
         <h1 class="cd-title">
-          Candy Dungeon Music Forge
+          AceForge
         </h1>
       </div>
       <span class="cd-alpha">v0.1</span>
@@ -769,7 +769,7 @@ HTML = r"""
       {% endif %}
 
       <div class="footer">
-        Tip: Start with 0.5–2.0s fade in/out. When “Instrumental” is checked, Candy Dungeon Music Forge sends [inst] as the ACE-Step lyrics token so the model focuses on backing tracks. ACE-Step can generate up to ~4 minutes in one shot, so you don't need tiling or stitching here.
+        Tip: Start with 0.5–2.0s fade in/out. When “Instrumental” is checked, AceForge sends [inst] as the ACE-Step lyrics token so the model focuses on backing tracks. ACE-Step can generate up to ~4 minutes in one shot, so you don't need tiling or stitching here.
       </div>
     </form>
 
@@ -1350,7 +1350,7 @@ HTML = r"""
           <span class="small">
             Click <strong>Browse…</strong>, then select the folder that contains
             your training tracks. The folder MUST live under the
-            <code>training_datasets</code> directory in the Music Forge root.
+            <code>training_datasets</code> directory in the AceForge root.
             Only <code>.mp3</code> / <code>.wav</code> files in that folder will
             be touched.
           </span>
@@ -1478,7 +1478,7 @@ HTML = r"""
 
           <span class="small">
             The MuFun-ACEStep model is large and will be stored locally under
-            the Music Forge <code>models</code> folder. Once installed, you can
+            the AceForge <code>models</code> folder. Once installed, you can
             reuse it for multiple datasets.
           </span>
         </div>

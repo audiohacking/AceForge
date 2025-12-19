@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec file for Candy Dungeon Music Forge (macOS)
+# PyInstaller spec file for AceForge (macOS)
 
 import sys
 from pathlib import Path
@@ -64,7 +64,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='CandyDungeonMusicForge',
+    name='AceForge',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -85,18 +85,18 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='CandyDungeonMusicForge',
+    name='AceForge',
 )
 
 # macOS app bundle
 app = BUNDLE(
     coll,
-    name='CandyDungeonMusicForge.app',
+    name='AceForge.app',
     icon=None,  # Add icon path if you have a .icns file
-    bundle_identifier='com.candydungeon.musicforge',
+    bundle_identifier='com.aceforge.app',
     info_plist={
-        'CFBundleName': 'Candy Dungeon Music Forge',
-        'CFBundleDisplayName': 'Candy Dungeon Music Forge',
+        'CFBundleName': 'AceForge',
+        'CFBundleDisplayName': 'AceForge',
         'CFBundleShortVersionString': '0.1.0-macos',
         'CFBundleVersion': '0.1.0',
         'NSHighResolutionCapable': True,

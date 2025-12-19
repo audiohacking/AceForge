@@ -59,7 +59,7 @@ jobs:
       run: |
         # Create a temporary directory for DMG contents
         mkdir -p dmg_temp
-        cp -R dist/CandyDungeonMusicForge.app dmg_temp/
+        cp -R dist/AceForge.app dmg_temp/
         
         # Create Applications symlink for easy drag-and-drop install
         ln -s /Applications dmg_temp/Applications
@@ -68,34 +68,34 @@ jobs:
         cp .github/DMG_README.txt dmg_temp/README.txt
         
         # Create DMG
-        hdiutil create -volname "CandyDungeonMusicForge" \
+        hdiutil create -volname "AceForge" \
           -srcfolder dmg_temp \
           -ov -format UDZO \
-          CandyDungeonMusicForge-macOS.dmg
+          AceForge-macOS.dmg
           
     - name: Create ZIP archive (alternative distribution)
       run: |
         cd dist
-        zip -r ../CandyDungeonMusicForge-macOS.zip CandyDungeonMusicForge.app
+        zip -r ../AceForge-macOS.zip AceForge.app
         cd ..
         
     - name: Calculate checksums
       run: |
-        shasum -a 256 CandyDungeonMusicForge-macOS.dmg > checksums.txt
-        shasum -a 256 CandyDungeonMusicForge-macOS.zip >> checksums.txt
+        shasum -a 256 AceForge-macOS.dmg > checksums.txt
+        shasum -a 256 AceForge-macOS.zip >> checksums.txt
         cat checksums.txt
         
     - name: Upload DMG artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CandyDungeonMusicForge-macOS-DMG
-        path: CandyDungeonMusicForge-macOS.dmg
+        name: AceForge-macOS-DMG
+        path: AceForge-macOS.dmg
         
     - name: Upload ZIP artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CandyDungeonMusicForge-macOS-ZIP
-        path: CandyDungeonMusicForge-macOS.zip
+        name: AceForge-macOS-ZIP
+        path: AceForge-macOS.zip
         
     - name: Upload checksums
       uses: actions/upload-artifact@v4
@@ -108,8 +108,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          CandyDungeonMusicForge-macOS.dmg
-          CandyDungeonMusicForge-macOS.zip
+          AceForge-macOS.dmg
+          AceForge-macOS.zip
           checksums.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

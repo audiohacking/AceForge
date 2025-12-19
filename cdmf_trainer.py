@@ -1,4 +1,4 @@
-# C:\CandyDungeonMusicForge\cdmf_trainer.py
+# C:\AceForge\cdmf_trainer.py
 # Customized version of the ACE-Step trainer.py script.
 
 from pytorch_lightning.callbacks import ModelCheckpoint

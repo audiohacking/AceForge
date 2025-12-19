@@ -1,4 +1,4 @@
-# C:\CandyDungeonMusicForge\cdmf_lyrics.py  (new file)
+# C:\AceForge\cdmf_lyrics.py  (new file)
 
 from __future__ import annotations
 

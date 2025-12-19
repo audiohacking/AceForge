@@ -1,4 +1,4 @@
-# C:\CandyDungeonMusicForge\cdmf_tracks.py
+# C:\AceForge\cdmf_tracks.py
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def load_presets() -> Dict[str, Any]:
         data.setdefault("vocal", [])
         return data
     except Exception as e:
-        print(f"[Candy Music Forge] Failed to load presets.json: {e}", flush=True)
+        print(f"[AceForge] Failed to load presets.json: {e}", flush=True)
         return {"instrumental": [], "vocal": []}
 
 
@@ -64,7 +64,7 @@ def save_track_meta(meta: Dict[str, Any]) -> None:
         with TRACK_META_PATH.open("w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, sort_keys=True)
     except Exception as e:
-        print(f"[Candy Music Forge] Failed to save tracks_meta.json: {e}", flush=True)
+        print(f"[AceForge] Failed to save tracks_meta.json: {e}", flush=True)
 
 
 def load_user_presets() -> Dict[str, Any]:
@@ -99,7 +99,7 @@ def save_user_presets(data: Dict[str, Any]) -> None:
         with USER_PRESETS_PATH.open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, sort_keys=True)
     except Exception as e:
-        print(f"[Candy Music Forge] Failed to save user_presets.json: {e}", flush=True)
+        print(f"[AceForge] Failed to save user_presets.json: {e}", flush=True)
 
 
 def list_music_files() -> List[str]:
@@ -149,7 +149,7 @@ def list_lora_adapters() -> List[Dict[str, Any]]:
                 }
             )
     except Exception as exc:
-        print(f"[Candy Music Forge] Failed to list LoRA adapters: {exc}", flush=True)
+        print(f"[AceForge] Failed to list LoRA adapters: {exc}", flush=True)
 
     return adapters
 
@@ -163,7 +163,7 @@ def create_tracks_blueprint() -> Blueprint:
 
     @bp.route("/music/<path:filename>")
     def serve_music(filename: str):
-        """Serve audio files from the Candy Dungeon Music Forge music directory."""
+        """Serve audio files from the AceForge music directory."""
         return send_from_directory(DEFAULT_OUT_DIR, filename)
 
     @bp.route("/progress", methods=["GET"])

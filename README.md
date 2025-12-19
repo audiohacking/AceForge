@@ -1,6 +1,6 @@
-# Candy Dungeon Music Forge (CDMF) - macOS Edition
+# AceForge - macOS Edition
 
-Candy Dungeon Music Forge (CDMF) is a **local-first AI music workstation for macOS**. It runs on your Mac, uses Apple Metal (MPS) GPU acceleration, and keeps your prompts and audio on your hardware. CDMF is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
+AceForge is a **local-first AI music workstation for macOS**. It runs on your Mac, uses Apple Metal (MPS) GPU acceleration, and keeps your prompts and audio on your hardware. AceForge is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
 
 This fork is optimized for macOS with Apple Metal support, designed for both Apple Silicon (M1/M2/M3) and Intel Macs.
 
@@ -41,11 +41,11 @@ Status: **v0.1-macos**
 
 ### Option 1: Download Pre-built Release (Easiest)
 
-**Coming Soon!** Pre-built macOS application bundles will be available from the [Releases page](https://github.com/audiohacking/CDMF-Fork/releases).
+**Coming Soon!** Pre-built macOS application bundles will be available from the [Releases page](https://github.com/audiohacking/AceForge-Fork/releases).
 
-1. Download `CandyDungeonMusicForge-macOS.dmg` from the latest release
+1. Download `AceForge-macOS.dmg` from the latest release
 2. Open the DMG file
-3. Drag `CandyDungeonMusicForge.app` to your Applications folder
+3. Drag `AceForge.app` to your Applications folder
 4. Right-click the app and select "Open" (first time only, to bypass Gatekeeper)
 5. The application will start and open in your browser
 
@@ -68,18 +68,18 @@ brew install python@3.10
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/audiohacking/CDMF-Fork.git
-   cd CDMF-Fork
+   git clone https://github.com/audiohacking/AceForge-Fork.git
+   cd AceForge-Fork
    ```
 
 2. Make the launcher script executable:
    ```bash
-   chmod +x CDMF.sh
+   chmod +x AceForge.sh
    ```
 
 3. Run the launcher:
    ```bash
-   ./CDMF.sh
+   ./AceForge.sh
    ```
 
 4. On first run, the script will:
@@ -89,19 +89,19 @@ brew install python@3.10
    - Install helpers like `audio-separator`
    - Open the UI in your default browser
 
-The terminal window must remain open while CDMF is running. Press Ctrl+C to stop the server.
+The terminal window must remain open while AceForge is running. Press Ctrl+C to stop the server.
 
-On first run, CDMF does real setup work:
+On first run, AceForge does real setup work:
 - Creates a Python virtual environment (e.g. `venv_ace`)
 - Installs packages from `requirements_ace.txt`
 - Downloads ACE-Step and related models as needed
 - Installs helpers like `audio-separator`
 
-A console window (“server console”) appears and **must stay open** while CDMF runs. CDMF will open a loading page in your browser and then load the full UI when ready.
+A console window (“server console”) appears and **must stay open** while AceForge runs. AceForge will open a loading page in your browser and then load the full UI when ready.
 
-## Using CDMF (high-level workflow)
+## Using AceForge (high-level workflow)
 
-1. Launch CDMF and wait for the UI
+1. Launch AceForge and wait for the UI
 2. Go to **Generate** → create tracks from prompt (and lyrics if desired)
 3. Browse/manage tracks in **Music Player**
 4. (Optional) Use stem controls to adjust vocal/instrumental balance
@@ -112,14 +112,14 @@ A console window (“server console”) appears and **must stay open** while CDM
 - **Prompt**: your main ACE-Step tags / description (genre, instruments, mood, context)
 - **Instrumental** mode:
   - Lyrics are not used
-  - CDMF uses the `[inst]` token so ACE-Step focuses on backing tracks
+  - AceForge uses the `[inst]` token so ACE-Step focuses on backing tracks
 - **Vocal** mode:
   - Provide lyrics using markers like `[verse]`, `[chorus]`, `[solo]`, etc.
 - **Presets** let you save/load a whole “knob bundle” (text + sliders)
 
 ## Stem separation (vocals vs instrumentals)
 
-CDMF can run `audio-separator` as a post-process step so you can rebalance:
+AceForge can run `audio-separator` as a post-process step so you can rebalance:
 - Vocals level (dB)
 - Instrumental level (dB)
 
@@ -133,13 +133,13 @@ Switch to the **Training** tab to configure and start LoRA runs.
 
 Datasets must live under:
 
-`<CDMF root>\training_datasets`
+`<AceForge root>\training_datasets`
 
 For each audio file (`foo.mp3` or `foo.wav`), provide:
 - `foo_prompt.txt` — ACE-Step prompt/tags for that track
 - `foo_lyrics.txt` — lyrics, or `[inst]` for instrumentals
 
-CDMF includes tools to bulk-create these files (and optionally auto-generate them with MuFun-ACEStep).
+AceForge includes tools to bulk-create these files (and optionally auto-generate them with MuFun-ACEStep).
 
 ### Training parameters (examples)
 
@@ -176,7 +176,7 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
   - Try setting `ACE_PIPELINE_DTYPE=float32` environment variable if you encounter precision issues:
     ```bash
     export ACE_PIPELINE_DTYPE=float32
-    ./CDMF.sh
+    ./AceForge.sh
     ```
 
 - **Python version issues**:
@@ -188,9 +188,9 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
   brew install python@3.10
   ```
 
-- **Permission denied when running CDMF.sh**:
+- **Permission denied when running AceForge.sh**:
   ```bash
-  chmod +x CDMF.sh
+  chmod +x AceForge.sh
   ```
 
 - **Browser doesn't open automatically**: 
@@ -201,7 +201,7 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
   ```bash
   # Remove existing venv and recreate
   rm -rf venv_ace
-  ./CDMF.sh
+  ./AceForge.sh
   ```
 
 ## Performance Tips for Apple Silicon
@@ -213,13 +213,13 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 
 ## About This Fork
 
-This is a **macOS-optimized fork** of Candy Dungeon Music Forge, specifically designed for Apple Metal (MPS) GPU acceleration. This fork focuses exclusively on macOS support and does not maintain Windows compatibility.
+This is a **macOS-optimized** version specifically designed for Apple Metal (MPS) GPU acceleration. This fork focuses exclusively on macOS support and does not maintain Windows compatibility.
 
 ### Differences from Original
 
 - **Apple Metal (MPS) GPU support**: Optimized for Apple Silicon and Intel Macs with AMD GPUs
 - **Device-agnostic code**: Automatic device selection (MPS → CPU fallback)
-- **macOS launcher**: Native bash script (`CDMF.sh`) instead of Windows batch file
+- **macOS launcher**: Native bash script (`AceForge.sh`) instead of Windows batch file
 - **Unified memory optimizations**: Leverages Apple Silicon's unified memory architecture
 - **macOS-specific dependencies**: Windows-specific packages removed
 
@@ -228,7 +228,7 @@ This is a **macOS-optimized fork** of Candy Dungeon Music Forge, specifically de
 To port updates from the original Windows version:
 
 1. The original Windows requirements are preserved in `requirements_ace_windows_reference.txt`
-2. The original Windows launcher is in `CDMF.bat`
+2. The original Windows launcher is in `AceForge.bat`
 3. When merging updates, focus on:
    - Core model and pipeline logic
    - UI and generation features
@@ -272,15 +272,15 @@ pip install "py3langid==0.3.0" --no-deps
 pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
 
 # Build with PyInstaller
-pyinstaller CDMF.spec
+pyinstaller AceForge.spec
 
-# The .app bundle will be in dist/CandyDungeonMusicForge.app
+# The .app bundle will be in dist/AceForge.app
 
 # Optional: Create DMG
-hdiutil create -volname "CandyDungeonMusicForge" \
-  -srcfolder dist/CandyDungeonMusicForge.app \
+hdiutil create -volname "AceForge" \
+  -srcfolder dist/AceForge.app \
   -ov -format UDZO \
-  CandyDungeonMusicForge-macOS.dmg
+  AceForge-macOS.dmg
 ```
 
 The build process creates a self-contained macOS application that includes:
@@ -302,17 +302,10 @@ Issues and PRs welcome. If you’re changing anything related to training, model
 ## License
 
 This project’s **source code** is licensed under the **Apache License 2.0**. See `LICENSE`.
-
-Note: Model weights and third-party tools used by CDMF (ACE-Step, PyTorch, audio-separator, MuFun-ACEStep, any LLM backend, etc.) are covered by their own licenses/terms.
-
 ## Trademarks
 
-“Candy Dungeon”, “Candy Dungeon Music Forge”, and associated logos/branding are **trademarks of the project owner** and are **not** granted under the Apache-2.0 license.
-
-See `TRADEMARKS.md` for permitted use (e.g., descriptive references are fine; distributing a fork under the same name/logo is not).
+This project was originally forked from a project with trademarked branding ("Candy Dungeon"). All such trademarked names and branding have been removed from this fork to comply with trademark regulations. This project is now known as "AceForge".
 
 ## Support
 
-If you find CDMF useful and want to support development, you can:
-- email support@candydungeon.com for more info
-- Contribute to the creator's Ko-Fi and buy him a coffee/cigar if you want: https://ko-fi.com/davidhagar
+If you find AceForge useful and want to support development, you can open issues or contribute via pull requests on GitHub.
