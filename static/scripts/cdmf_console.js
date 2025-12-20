@@ -73,15 +73,25 @@
     const consoleOutput = document.getElementById('consoleOutput');
     if (!consoleOutput) return;
 
-    // Add the line
+    // Create a text node for the new line
     const lineText = document.createTextNode(line + '\n');
     consoleOutput.appendChild(lineText);
 
-    // Trim old lines if we exceed max
-    const lines = consoleOutput.textContent.split('\n');
-    if (lines.length > MAX_CONSOLE_LINES) {
-      const trimmed = lines.slice(-MAX_CONSOLE_LINES).join('\n');
-      consoleOutput.textContent = trimmed;
+    // Efficiently trim old lines by counting child nodes
+    // Each line is a text node, so count them
+    const textNodes = [];
+    for (let node of consoleOutput.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        textNodes.push(node);
+      }
+    }
+
+    // Remove old nodes if we exceed max lines
+    if (textNodes.length > MAX_CONSOLE_LINES) {
+      const nodesToRemove = textNodes.length - MAX_CONSOLE_LINES;
+      for (let i = 0; i < nodesToRemove; i++) {
+        consoleOutput.removeChild(textNodes[i]);
+      }
     }
 
     // Auto-scroll to bottom if already near bottom

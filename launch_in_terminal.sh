@@ -1,7 +1,7 @@
 #!/bin/bash
 # ---------------------------------------------------------------------------
 #  AceForge - Backend Server Runner
-#  This script is runs the AceForge backend in a Terminal window
+#  This script runs the AceForge backend in a Terminal window
 # ---------------------------------------------------------------------------
 
 # Get the directory where this script lives

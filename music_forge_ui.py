@@ -111,11 +111,26 @@ class StreamToLogger:
         self.linebuf = ''
 
     def write(self, buf):
-        for line in buf.rstrip().splitlines():
-            self.logger.log(self.log_level, line.rstrip())
+        # Handle partial writes by buffering until we get a newline
+        temp_buf = self.linebuf + buf
+        lines = temp_buf.splitlines(keepends=True)
+        
+        # Process complete lines (those ending with newline)
+        for line in lines[:-1]:
+            if line.endswith(('\n', '\r\n', '\r')):
+                self.logger.log(self.log_level, line.rstrip())
+        
+        # Keep any incomplete line in buffer
+        if lines and not lines[-1].endswith(('\n', '\r\n', '\r')):
+            self.linebuf = lines[-1]
+        else:
+            self.linebuf = ''
     
     def flush(self):
-        pass
+        # Flush any remaining buffered content
+        if self.linebuf:
+            self.logger.log(self.log_level, self.linebuf.rstrip())
+            self.linebuf = ''
 
 # Redirect stdout and stderr to logging (for frozen app)
 if getattr(sys, 'frozen', False):
