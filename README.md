@@ -48,21 +48,19 @@ Pre-built macOS application bundles are available from the [Releases page](https
 **Installation:**
 1. Download `AceForge-macOS.dmg` from the latest release
 2. Open the DMG file
-3. Copy both `AceForge.app` and `AceForge.command` to a location on your Mac
+3. Drag `AceForge.app` to your Applications folder (or any location on your Mac)
 
 **To Launch:**
 
-**Method A (Recommended): With Terminal Window**
-- Double-click `AceForge.command` 
-- A Terminal window will open showing server logs
-- Your browser will open automatically when ready
+- Double-click `AceForge.app`
+- A Terminal window will open automatically showing server logs
+- Your browser will open automatically when the server is ready
 - Keep the Terminal window open while using AceForge
-- To stop: Press Ctrl+C in Terminal or use the "Exit" button in browser
+- To stop: Press Ctrl+C in Terminal or use the "Exit" button in the browser
 
-**Method B: Background Mode**
-- Right-click `AceForge.app` and select "Open" (first time only, to bypass Gatekeeper)
-- The app runs in the background
-- Open browser to `http://127.0.0.1:5056/`
+**Note:** On first launch, macOS may show a security warning. Go to System Settings > Privacy & Security and click "Open Anyway". This is normal for apps downloaded from the internet.
+
+**Alternative:** You can also double-click `AceForge.command` if it's included in the DMG, but it's no longer necessary.
 - To stop: Use the "Exit" button in the web interface
 
 **Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically. You can monitor the download progress in the Terminal window (Method A) or in the Console Panel in the web interface.
