@@ -82,7 +82,7 @@ multidict==6.7.0
 multiprocess==0.70.16
 murmurhash==1.0.15
 mutagen==1.47.0
-networkx==3.5
+networkx==3.4
 nnAudio==0.3.3
 num2words==0.5.14
 numba==0.62.1
