@@ -102,5 +102,8 @@ app = BUNDLE(
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '12.0',
         'NSRequiresAquaSystemAppearance': False,
+        # Launch in Terminal to keep console visible
+        'LSUIElement': False,  # Show in dock
+        'LSBackgroundOnly': False,  # Run in foreground
     },
 )

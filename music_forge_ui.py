@@ -5,8 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 import os
+import threading
+import queue
+import logging
+from io import StringIO
 
-from flask import Flask
+from flask import Flask, Response, request
 
 # ---------------------------------------------------------------------------
 # Diffusers / ace-step compatibility shim (early)
@@ -65,6 +69,73 @@ from cdmf_lyrics import create_lyrics_blueprint
 
 # Flask app
 app = Flask(__name__)
+
+# ---------------------------------------------------------------------------
+# Log streaming infrastructure
+# ---------------------------------------------------------------------------
+
+# Queue to hold log messages for streaming to browser
+LOG_QUEUE = queue.Queue(maxsize=1000)
+
+class QueueHandler(logging.Handler):
+    """Custom logging handler that puts messages into a queue for streaming"""
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            # Try to add to queue, drop if full
+            try:
+                LOG_QUEUE.put_nowait(msg)
+            except queue.Full:
+                pass  # Drop message if queue is full
+        except Exception:
+            self.handleError(record)
+
+# Set up logging to capture stdout/stderr AND put into queue
+log_handler = QueueHandler()
+log_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s', 
+                              datefmt='%Y-%m-%d %H:%M:%S')
+log_handler.setFormatter(formatter)
+
+# Get root logger and add our handler
+root_logger = logging.getLogger()
+root_logger.addHandler(log_handler)
+root_logger.setLevel(logging.INFO)
+
+# Also redirect stdout and stderr to logging
+class StreamToLogger:
+    """File-like object that redirects writes to a logger"""
+    def __init__(self, logger, log_level=logging.INFO):
+        self.logger = logger
+        self.log_level = log_level
+        self.linebuf = ''
+
+    def write(self, buf):
+        # Handle partial writes by buffering until we get a newline
+        temp_buf = self.linebuf + buf
+        lines = temp_buf.splitlines(keepends=True)
+        
+        # Process complete lines (those ending with newline)
+        for line in lines[:-1]:
+            if line.endswith(('\n', '\r\n', '\r')):
+                self.logger.log(self.log_level, line.rstrip())
+        
+        # Keep any incomplete line in buffer
+        if lines and not lines[-1].endswith(('\n', '\r\n', '\r')):
+            self.linebuf = lines[-1]
+        else:
+            self.linebuf = ''
+    
+    def flush(self):
+        # Flush any remaining buffered content
+        if self.linebuf:
+            self.logger.log(self.log_level, self.linebuf.rstrip())
+            self.linebuf = ''
+
+# Redirect stdout and stderr to logging (for frozen app)
+if getattr(sys, 'frozen', False):
+    sys.stdout = StreamToLogger(logging.getLogger('STDOUT'), logging.INFO)
+    sys.stderr = StreamToLogger(logging.getLogger('STDERR'), logging.ERROR)
 
 # Wire ACE-Step's progress callback into our shared state
 register_progress_callback(cdmf_state.ace_progress_callback)
@@ -125,6 +196,67 @@ def loading_page():
     once the server is responding.
     """
     return app.send_static_file("loading.html")
+
+
+# ---------------------------------------------------------------------------
+# Log streaming and shutdown endpoints
+# ---------------------------------------------------------------------------
+
+@app.route("/logs/stream", methods=["GET"])
+def stream_logs():
+    """
+    Server-Sent Events endpoint that streams log messages to the browser
+    """
+    def generate():
+        # Send initial connection message
+        yield f"data: [System] Log streaming connected\n\n"
+        
+        # Stream logs from the queue
+        while True:
+            try:
+                # Wait for a log message (timeout every 30 seconds for keep-alive)
+                msg = LOG_QUEUE.get(timeout=30)
+                # Send the log message as SSE
+                yield f"data: {msg}\n\n"
+            except queue.Empty:
+                # Send keep-alive comment
+                yield ": keep-alive\n\n"
+            except Exception as e:
+                yield f"data: [Error] Log streaming error: {e}\n\n"
+                break
+    
+    return Response(generate(), mimetype='text/event-stream',
+                   headers={
+                       'Cache-Control': 'no-cache',
+                       'X-Accel-Buffering': 'no',
+                   })
+
+
+@app.route("/shutdown", methods=["POST"])
+def shutdown_server():
+    """
+    Endpoint to gracefully shutdown the server
+    """
+    try:
+        logging.info("[AceForge] Shutdown requested from UI")
+        print("[AceForge] Shutting down server...", flush=True)
+        
+        # Use a thread to shutdown after responding
+        def shutdown():
+            import time
+            time.sleep(1)  # Give time for response to be sent
+            # Raise KeyboardInterrupt to trigger Waitress shutdown
+            import signal
+            os.kill(os.getpid(), signal.SIGINT)
+        
+        shutdown_thread = threading.Thread(target=shutdown)
+        shutdown_thread.daemon = True
+        shutdown_thread.start()
+        
+        return {"status": "ok", "message": "Server is shutting down..."}, 200
+    except Exception as e:
+        logging.error(f"[AceForge] Shutdown error: {e}")
+        return {"status": "error", "message": str(e)}, 500
 
 
 # ---------------------------------------------------------------------------

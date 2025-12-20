@@ -43,15 +43,29 @@ Status: **v0.1-macos**
 
 ### Option 1: Download Pre-built Release (Easiest)
 
-**Coming Soon!** Pre-built macOS application bundles will be available from the [Releases page](https://github.com/audiohacking/AceForge-Fork/releases).
+Pre-built macOS application bundles are available from the [Releases page](https://github.com/audiohacking/AceForge/releases).
 
+**Installation:**
 1. Download `AceForge-macOS.dmg` from the latest release
 2. Open the DMG file
-3. Drag `AceForge.app` to your Applications folder
-4. Right-click the app and select "Open" (first time only, to bypass Gatekeeper)
-5. The application will start and open in your browser
+3. Copy both `AceForge.app` and `AceForge.command` to a location on your Mac
 
-**Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically.
+**To Launch:**
+
+**Method A (Recommended): With Terminal Window**
+- Double-click `AceForge.command` 
+- A Terminal window will open showing server logs
+- Your browser will open automatically when ready
+- Keep the Terminal window open while using AceForge
+- To stop: Press Ctrl+C in Terminal or use the "Exit" button in browser
+
+**Method B: Background Mode**
+- Right-click `AceForge.app` and select "Open" (first time only, to bypass Gatekeeper)
+- The app runs in the background
+- Open browser to `http://127.0.0.1:5056/`
+- To stop: Use the "Exit" button in the web interface
+
+**Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically. You can monitor the download progress in the Terminal window (Method A) or in the Console Panel in the web interface.
 
 ### Option 2: Run from Source
 
@@ -76,12 +90,12 @@ brew install python@3.10
 
 2. Make the launcher script executable:
    ```bash
-   chmod +x AceForge.sh
+   chmod +x CDMF.sh
    ```
 
 3. Run the launcher:
    ```bash
-   ./AceForge.sh
+   ./CDMF.sh
    ```
 
 4. On first run, the script will:
@@ -108,6 +122,21 @@ A console window (“server console”) appears and **must stay open** while Ace
 3. Browse/manage tracks in **Music Player**
 4. (Optional) Use stem controls to adjust vocal/instrumental balance
 5. (Optional) Build a dataset and train a LoRA in **Training**
+6. **To Exit**: Click the "Exit" button in the top-right corner or press Ctrl+C in the terminal
+
+### New UI Features
+
+**Server Console Panel** (v0.1+)
+- Click "▼ Server Console" at the top of the page to expand/collapse
+- View real-time server logs directly in the browser
+- Useful for troubleshooting errors and monitoring model downloads
+- Logs are displayed in a terminal-style interface with auto-scrolling
+
+**Exit Button** (v0.1+)
+- Located in the top-right corner of the UI
+- Gracefully shuts down the AceForge server
+- Closes all services and terminates the backend
+- Safe to use instead of force-closing the terminal window
 
 ## Generation basics
 
@@ -178,7 +207,7 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
   - Try setting `ACE_PIPELINE_DTYPE=float32` environment variable if you encounter precision issues:
     ```bash
     export ACE_PIPELINE_DTYPE=float32
-    ./AceForge.sh
+    ./CDMF.sh
     ```
 
 - **Python version issues**:
@@ -190,9 +219,9 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
   brew install python@3.11
   ```
 
-- **Permission denied when running AceForge.sh**:
+- **Permission denied when running CDMF.sh**:
   ```bash
-  chmod +x AceForge.sh
+  chmod +x CDMF.sh
   ```
 
 - **Browser doesn't open automatically**: 
@@ -203,7 +232,7 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
   ```bash
   # Remove existing venv and recreate
   rm -rf venv_ace
-  ./AceForge.sh
+  ./CDMF.sh
   ```
 
 ## Performance Tips for Apple Silicon
@@ -221,7 +250,7 @@ This is a **macOS-optimized** version specifically designed for Apple Metal (MPS
 
 - **Apple Metal (MPS) GPU support**: Optimized for Apple Silicon and Intel Macs with AMD GPUs
 - **Device-agnostic code**: Automatic device selection (MPS → CPU fallback)
-- **macOS launcher**: Native bash script (`AceForge.sh`) instead of Windows batch file
+- **macOS launcher**: Native bash script (`CDMF.sh`) instead of Windows batch file
 - **Unified memory optimizations**: Leverages Apple Silicon's unified memory architecture
 - **macOS-specific dependencies**: Windows-specific packages removed
 

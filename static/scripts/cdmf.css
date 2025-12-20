@@ -574,3 +574,49 @@ p {
   gap: 8px;
   align-items: center;
 }
+
+/* Console output styles ---------------------------------------------------- */
+
+.console-output {
+  background: #000;
+  color: #0f0;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 12px;
+  border-radius: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #1f2937;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.console-output::-webkit-scrollbar {
+  width: 8px;
+}
+
+.console-output::-webkit-scrollbar-track {
+  background: #111827;
+  border-radius: 4px;
+}
+
+.console-output::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 4px;
+}
+
+.console-output::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+#consoleToggleIcon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 0.8em;
+  margin-right: 4px;
+}
+
+#consoleToggleIcon.expanded {
+  transform: rotate(180deg);
+}

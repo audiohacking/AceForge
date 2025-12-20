@@ -55,11 +55,21 @@ jobs:
       run: |
         pyinstaller CDMF.spec
         
+    - name: Add terminal launcher script to app bundle
+      run: |
+        # Copy the launcher script into the MacOS directory of the app bundle
+        cp launch_in_terminal.sh dist/AceForge.app/Contents/MacOS/
+        chmod +x dist/AceForge.app/Contents/MacOS/launch_in_terminal.sh
+        
     - name: Create DMG (macOS disk image)
       run: |
         # Create a temporary directory for DMG contents
         mkdir -p dmg_temp
         cp -R dist/AceForge.app dmg_temp/
+        
+        # Copy the .command file for easy launching
+        cp AceForge.command dmg_temp/
+        chmod +x dmg_temp/AceForge.command
         
         # Create Applications symlink for easy drag-and-drop install
         ln -s /Applications dmg_temp/Applications

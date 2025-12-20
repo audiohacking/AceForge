@@ -29,12 +29,35 @@ HTML = r"""
           AceForge
         </h1>
       </div>
-      <span class="cd-alpha">v0.1</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="cd-alpha">v0.1</span>
+        <button type="button" class="btn danger" id="btnExitApp" title="Exit AceForge">
+          <span class="icon">🚪</span><span class="label">Exit</span>
+        </button>
+      </div>
     </div>
 
     <p class="tagline">
       Generate unlimited custom music with a simple prompt and style presets via ACE-Step.
     </p>
+
+    <!-- Console panel (collapsible) -->
+    <div class="card" id="consoleCard">
+      <div class="card-header-row" style="cursor:pointer;" onclick="CDMF.toggleConsole && CDMF.toggleConsole()">
+        <h2 style="margin:0;">
+          <span id="consoleToggleIcon">▼</span> Server Console
+        </h2>
+        <span class="small" style="opacity:0.7;">
+          Click to expand/collapse
+        </span>
+      </div>
+      <div id="consolePanel" style="display:none;">
+        <div id="consoleOutput" class="console-output"></div>
+        <div class="small" style="margin-top:8px;opacity:0.7;">
+          Real-time server logs. Useful for troubleshooting errors.
+        </div>
+      </div>
+    </div>
 
     <!-- Music player card -->
     <div class="card">
@@ -1644,6 +1667,7 @@ HTML = r"""
   <script src="{{ url_for('static', filename='scripts/cdmf_training_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_mufun_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_lora_ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='scripts/cdmf_console.js') }}"></script>
 </body>
 </html>
 """
