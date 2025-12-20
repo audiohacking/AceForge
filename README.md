@@ -1,4 +1,4 @@
-<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/a00aec1a-1204-49b6-84df-36fd7ccbf523" />
+<img width="235" height="250" alt="image" src="https://github.com/user-attachments/assets/d19e1f9c-511e-424e-97ed-20b2a7035b75" />
 
 # AceForge
 
