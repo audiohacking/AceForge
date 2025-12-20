@@ -9,7 +9,7 @@ HTML = r"""
 <head>
   <meta charset="utf-8">
   <title>AceForge (v0.1)</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='cdmf_logo_new.png') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='aceforge_logo.png') }}">
 
   <!-- External CSS instead of inline <style> -->
   <link rel="stylesheet" href="{{ url_for('static', filename='scripts/cdmf.css') }}">
@@ -21,7 +21,7 @@ HTML = r"""
       <div class="cd-titlewrap">
         <span class="cd-logo">
           <img
-            src="{{ url_for('static', filename='cdmf_logo_new.png') }}"
+            src="{{ url_for('static', filename='aceforge_logo.png') }}"
             alt="AceForge logo"
           >
         </span>
