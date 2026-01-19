@@ -2,9 +2,6 @@
 # This file contains dependencies for running CDMF on macOS with Apple Metal (MPS) support
 # Windows-specific packages (pywin32-ctypes, win32_setctime) have been removed
 
-# ACE-Step package (required for music generation)
-ace-step[gui]>=0.1.0
-
 absl-py==2.3.1
 accelerate==1.6.0
 aiofiles==23.2.1

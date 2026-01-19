@@ -4,9 +4,6 @@
 # Windows-specific packages: pywin32-ctypes, win32_setctime
 # PyTorch CUDA wheels from https://download.pytorch.org/whl/cu126
 
-# ACE-Step package (required for music generation)
-ace-step[gui]>=0.1.0
-
 aiohttp==3.13.2
 aiosignal==1.4.0
 altgraph==0.17.5

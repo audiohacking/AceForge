@@ -339,11 +339,11 @@ def _get_ace_pipeline() -> "ACEStepPipeline":
     if ACEStepPipeline is None:
         raise RuntimeError(
             "ACEStepPipeline could not be imported from cdmf_pipeline_ace_step.py.\n\n"
-            "This usually means the ace-step package is not installed or dependencies are missing.\n"
-            "Make sure you've installed all dependencies from requirements_ace.txt:\n"
-            '  pip install -r requirements_ace.txt\n\n'
-            "The ace-step package should be installed with:\n"
-            '  pip install "ace-step[gui]"\n\n'
+            "This usually means the ace-step package is not installed.\n"
+            "ACE-Step must be installed from GitHub (not PyPI) using:\n"
+            '  pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps\n\n'
+            "Or run the setup using the launcher script (CDMF.sh / CDMF.bat) which\n"
+            "will handle all dependencies automatically.\n\n"
             f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
         )
 
