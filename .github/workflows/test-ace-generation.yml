@@ -143,6 +143,15 @@ jobs:
     - name: Set Environment Variables for Lower Memory Usage
       run: |
         echo "PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0" >> $GITHUB_ENV
+        echo "Set PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0"
+        
+    - name: Verify Environment Variable is Set
+      run: |
+        echo "PYTORCH_MPS_HIGH_WATERMARK_RATIO=${PYTORCH_MPS_HIGH_WATERMARK_RATIO}"
+        if [ -z "$PYTORCH_MPS_HIGH_WATERMARK_RATIO" ]; then
+          echo "ERROR: PYTORCH_MPS_HIGH_WATERMARK_RATIO is not set!"
+          exit 1
+        fi
         
     - name: Run minimal generation test (10 seconds, instrumental)
       run: |
