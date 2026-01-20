@@ -1,0 +1,185 @@
+name: ACE-Step Generation Test
+
+on:
+  push:
+    branches: [ main, develop, copilot/** ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-ace-generation:
+    name: Test ACE-Step Generation End-to-End
+    runs-on: macos-latest
+    timeout-minutes: 60
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Display Python version
+      run: python --version
+      
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements_ace_macos.txt
+        
+    - name: Install audio-separator (no deps)
+      run: |
+        pip install "audio-separator==0.40.0" --no-deps
+        
+    - name: Install py3langid (no deps)
+      run: |
+        pip install "py3langid==0.3.0" --no-deps
+        
+    - name: Install ACE-Step (no deps)
+      run: |
+        pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
+      
+    - name: Verify ACE-Step import
+      run: |
+        python -c "
+        import sys
+        print('Testing ACE-Step imports...')
+        
+        # Test basic import
+        import acestep
+        print(f'✓ acestep package imported')
+        
+        # Test submodule imports (what's needed by cdmf_pipeline_ace_step.py)
+        from acestep.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+        print(f'✓ FlowMatchEulerDiscreteScheduler imported')
+        
+        from acestep.schedulers.scheduling_flow_match_heun_discrete import FlowMatchHeunDiscreteScheduler
+        print(f'✓ FlowMatchHeunDiscreteScheduler imported')
+        
+        from acestep.schedulers.scheduling_flow_match_pingpong import FlowMatchPingPongScheduler
+        print(f'✓ FlowMatchPingPongScheduler imported')
+        
+        from acestep.language_segmentation import LangSegment, language_filters
+        print(f'✓ LangSegment and language_filters imported')
+        
+        from acestep.music_dcae.music_dcae_pipeline import MusicDCAE
+        print(f'✓ MusicDCAE imported')
+        
+        from acestep.models.ace_step_transformer import ACEStepTransformer2DModel
+        print(f'✓ ACEStepTransformer2DModel imported')
+        
+        from acestep.models.lyrics_utils.lyric_tokenizer import VoiceBpeTokenizer
+        print(f'✓ VoiceBpeTokenizer imported')
+        
+        from acestep.apg_guidance import apg_forward, MomentumBuffer
+        print(f'✓ apg_forward and MomentumBuffer imported')
+        
+        from acestep.cpu_offload import cpu_offload
+        print(f'✓ cpu_offload imported')
+        
+        print('✓ All ACE-Step imports successful!')
+        "
+        
+    - name: Test cdmf_pipeline_ace_step.py import
+      run: |
+        python -c "
+        print('Testing cdmf_pipeline_ace_step.py import...')
+        from cdmf_pipeline_ace_step import ACEStepPipeline
+        print(f'✓ ACEStepPipeline class imported successfully')
+        print(f'✓ ACEStepPipeline type: {type(ACEStepPipeline)}')
+        "
+        
+    - name: Download ACE-Step models
+      run: |
+        echo "Downloading ACE-Step models..."
+        python ace_model_setup.py
+        
+    - name: Verify models downloaded
+      run: |
+        ls -la ace_models/checkpoints/ || echo "No checkpoints directory yet"
+        python -c "
+        from pathlib import Path
+        import sys
+        
+        # Check if models directory exists
+        models_dir = Path('ace_models/checkpoints')
+        if not models_dir.exists():
+            print('✗ Models directory does not exist')
+            sys.exit(1)
+            
+        # Check for required model subdirectories
+        required_dirs = ['music_dcae_f8c8', 'music_vocoder', 'ace_step_transformer', 'umt5-base']
+        all_exist = True
+        for dir_name in required_dirs:
+            dir_path = models_dir / dir_name
+            if dir_path.exists():
+                print(f'✓ {dir_name} directory exists')
+            else:
+                print(f'✗ {dir_name} directory missing')
+                all_exist = False
+        
+        if not all_exist:
+            print('✗ Not all required model directories exist')
+            sys.exit(1)
+        
+        print('✓ All required model directories exist')
+        "
+        
+    - name: Run minimal generation test (10 seconds, instrumental)
+      run: |
+        echo "Running minimal ACE-Step generation test..."
+        python generate_ace.py \
+          --genre-prompt "upbeat electronic music, synthwave" \
+          --instrumental \
+          --seconds 10 \
+          --steps 20 \
+          --guidance 4.0 \
+          --seed 42 \
+          --out-dir test_output \
+          --basename "ci_test_track"
+        
+    - name: Verify output file was created
+      run: |
+        python -c "
+        from pathlib import Path
+        import sys
+        
+        # Check if output directory exists
+        output_dir = Path('test_output')
+        if not output_dir.exists():
+            print('✗ Output directory does not exist')
+            sys.exit(1)
+        
+        # Find WAV files
+        wav_files = list(output_dir.glob('*.wav'))
+        if not wav_files:
+            print('✗ No WAV files found in output directory')
+            sys.exit(1)
+        
+        # Check file size (should be > 0)
+        for wav_file in wav_files:
+            size = wav_file.stat().st_size
+            print(f'✓ Generated file: {wav_file.name} ({size:,} bytes)')
+            if size == 0:
+                print(f'✗ File is empty')
+                sys.exit(1)
+            if size < 100000:  # At least 100KB for a 10-second audio
+                print(f'✗ File seems too small for 10 seconds of audio')
+                sys.exit(1)
+        
+        print('✓ Generation test successful - output file created and non-empty')
+        "
+        
+    - name: Upload test output as artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ace-generation-test-output
+        path: test_output/
+        retention-days: 7
