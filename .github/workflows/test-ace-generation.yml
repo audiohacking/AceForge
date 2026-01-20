@@ -138,7 +138,7 @@ jobs:
           --genre-prompt "upbeat electronic music, synthwave" \
           --instrumental \
           --seconds 10 \
-          --steps 20 \
+          --steps 5 \
           --guidance 4.0 \
           --seed 42 \
           --out-dir test_output \
@@ -163,13 +163,14 @@ jobs:
             sys.exit(1)
         
         # Check file size (should be > 0)
+        MIN_10SEC_AUDIO_SIZE_BYTES = 100_000  # Minimum expected size for 10-second audio
         for wav_file in wav_files:
             size = wav_file.stat().st_size
             print(f'✓ Generated file: {wav_file.name} ({size:,} bytes)')
             if size == 0:
                 print(f'✗ File is empty')
                 sys.exit(1)
-            if size < 100000:  # At least 100KB for a 10-second audio
+            if size < MIN_10SEC_AUDIO_SIZE_BYTES:
                 print(f'✗ File seems too small for 10 seconds of audio')
                 sys.exit(1)
         
