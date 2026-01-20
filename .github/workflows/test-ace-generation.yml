@@ -140,6 +140,10 @@ jobs:
         print('✓ All required model directories exist')
         "
         
+    - name: Set Environment Variables for Lower Memory Usage
+      run: |
+        echo "PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0" >> $GITHUB_ENV
+        
     - name: Run minimal generation test (10 seconds, instrumental)
       run: |
         echo "Running minimal ACE-Step generation test..."
