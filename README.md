@@ -58,13 +58,9 @@ Pre-built macOS application bundles are available from the [Releases page](https
 - Keep the Terminal window open while using AceForge
 - To stop: Press Ctrl+C in Terminal or use the "Exit" button in the browser
 
-If OSX complains about AceForge being corrupted on first usage, open the terminal and run this command:
+**Note:** On first launch, macOS may show a security warning because the app is not notarized by Apple. Go to System Settings > Privacy & Security and click "Open Anyway". This is normal for apps downloaded from the internet that are not distributed through the Mac App Store.
 
-```
-sudo xattr -cr /Applications/AceForge.app
-```
-
-**Note:** On first launch, macOS may show a security warning. Go to System Settings > Privacy & Security and click "Open Anyway". This is normal for apps downloaded from the internet.
+**Note for older releases:** If macOS prevents the app from opening with a "damaged" error, this is due to lack of code signing in older builds. Either download a newer release (which includes code signing) or run: `sudo xattr -cr /Applications/AceForge.app`
 
 **Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically. You can monitor the download progress in the Terminal window or in the Server Console panel in the web interface.
 
@@ -263,6 +259,14 @@ pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
 # Build with PyInstaller
 pyinstaller AceForge.spec
 
+# Code sign the app bundle (prevents "app is damaged" security warning)
+# For development, use ad-hoc signing (no certificate required):
+./build/macos/codesign.sh dist/AceForge.app
+
+# Or with a Developer ID certificate for distribution:
+# MACOS_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAM123)" \
+#   ./build/macos/codesign.sh dist/AceForge.app
+
 # The .app bundle will be in dist/AceForge.app
 
 # Optional: Create DMG
@@ -271,6 +275,8 @@ hdiutil create -volname "AceForge" \
   -ov -format UDZO \
   AceForge-macOS.dmg
 ```
+
+**Code Signing:** The build includes automated code signing to prevent macOS security warnings that would otherwise require running `sudo xattr -cr /Applications/AceForge.app`. By default, the script uses ad-hoc signing (no Apple Developer certificate required). For distribution, you can provide a Developer ID certificate. See `build/macos/README.md` for detailed documentation on code signing options.
 
 The build process creates a self-contained macOS application that includes:
 - Python runtime and all dependencies
