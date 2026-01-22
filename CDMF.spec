@@ -11,6 +11,7 @@ spec_root = Path(SPECPATH)
 static_dir = spec_root / 'static'
 training_config_dir = spec_root / 'training_config'
 ace_models_dir = spec_root / 'ace_models'
+icon_path = spec_root / 'build' / 'macos' / 'AceForge.icns'
 
 a = Analysis(
     ['music_forge_ui.py'],
@@ -112,7 +113,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='AceForge.app',
-    icon=None,  # Add icon path if you have a .icns file
+    icon=str(icon_path) if icon_path.exists() else None,  # Use AceForge logo icon
     bundle_identifier='com.aceforge.app',
     info_plist={
         'CFBundleName': 'AceForge',

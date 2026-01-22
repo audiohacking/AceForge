@@ -1,8 +1,8 @@
 name: ACE-Step Generation Test
 
 on:
-  pull_request:
-    branches: [ main, develop ]
+  release:
+    types: [created]
   workflow_dispatch:
 
 permissions:
