@@ -96,6 +96,40 @@ Simplified browser opening logic for macOS:
 - Uses `webbrowser.open()` for all cases
 - Cleaner, more maintainable code
 
+### 7. User Preferences and Data Storage
+
+**Files:**
+- `cdmf_user_dirs.py` - New module for OSX-compliant directories
+- `cdmf_paths.py` - Updated to use user directories
+
+Following macOS conventions, user data is now stored in proper system locations:
+
+**User Preferences** (`~/Library/Preferences/com.aceforge.app/`):
+- `aceforge_config.json` - Application configuration
+- `presets.json` - User's preset definitions
+- `user_presets.json` - Custom user presets
+- `tracks_meta.json` - Track metadata
+
+**Application Support** (`~/Library/Application Support/AceForge/`):
+- `ace_models/` - Downloaded AI models
+- `generated/` - Generated audio tracks
+- `training_datasets/` - Training datasets
+- `custom_lora/` - Custom LoRA adapters
+- `ace_training/` - Training logs and checkpoints
+- `training_config/` - Training configuration files
+- `models/` - Additional model caches (lyrics, MuFun)
+
+**Migration:**
+- Automatic migration from old APP_DIR-based storage on first launch
+- `.migration_complete` marker prevents re-migration
+- Preserves all user data during migration
+
+**Benefits:**
+- Settings persist across app updates
+- Follows Apple's Human Interface Guidelines
+- Users can easily find and back up their data
+- App bundle can be replaced without losing data
+
 ## Porting Updates from Upstream
 
 When merging changes from the original Windows version:
@@ -230,18 +264,36 @@ Tests:
 ## File Structure Reference
 
 ```
-CDMF-Fork/
+AceForge/
 ├── CDMF.sh                              # macOS launcher (PRIMARY)
 ├── CDMF.bat                             # Windows launcher (REFERENCE)
 ├── requirements_ace_macos.txt           # macOS deps (DEFAULT)
 ├── requirements_ace_windows_reference.txt  # Windows deps (REFERENCE)
 ├── cdmf_pipeline_ace_step.py           # Device selection & MPS support
 ├── cdmf_trainer.py                      # Training with device-agnostic autocast
+├── cdmf_user_dirs.py                    # OSX user directory management
+├── cdmf_paths.py                        # Path configuration (uses user dirs)
 ├── music_forge_ui.py                    # UI with macOS browser opening
 ├── .github/workflows/
 │   ├── macos-tests.yml                  # Main test workflow
 │   └── installation-test.yml            # Installation validation
 └── MACOS_PORT.md                        # This file
+
+User Data Directories (created at runtime):
+~/Library/Preferences/com.aceforge.app/  # User preferences
+├── aceforge_config.json                 # App configuration
+├── presets.json                         # Preset definitions
+├── user_presets.json                    # Custom presets
+└── tracks_meta.json                     # Track metadata
+
+~/Library/Application Support/AceForge/  # Application data
+├── ace_models/                          # AI models
+├── generated/                           # Generated audio
+├── training_datasets/                   # Training data
+├── custom_lora/                         # LoRA adapters
+├── ace_training/                        # Training logs
+├── training_config/                     # Training configs
+└── models/                              # Additional model caches
 ```
 
 ## Support and Contributing

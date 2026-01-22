@@ -280,6 +280,31 @@ The build process creates a self-contained macOS application that includes:
 
 **Note:** The app bundle does NOT include the large AI model files (~several GB). These are downloaded automatically on first run.
 
+## User Data Storage
+
+AceForge follows macOS conventions for storing user data, ensuring your settings and generated content persist across app updates:
+
+**User Preferences** (`~/Library/Preferences/com.aceforge.app/`):
+- Application settings and configuration
+- Presets and custom presets
+- Track metadata
+
+**Application Support** (`~/Library/Application Support/AceForge/`):
+- Downloaded AI models
+- Generated audio tracks
+- Training datasets and LoRA adapters
+- Training logs and checkpoints
+
+**Migration:** If you're upgrading from an older version that stored data inside the app bundle, AceForge will automatically migrate your data to the new locations on first launch.
+
+**Backup:** To back up your data:
+1. Settings: `~/Library/Preferences/com.aceforge.app/`
+2. Models and audio: `~/Library/Application Support/AceForge/`
+
+**Uninstall:** To completely remove AceForge:
+1. Delete the app: Move `AceForge.app` to Trash
+2. Delete user data: Remove the two directories listed above
+
 ## Contributing
 
 Issues and PRs welcome. If you’re changing anything related to training, model setup, or packaging, please include:
