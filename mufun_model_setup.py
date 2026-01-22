@@ -6,15 +6,18 @@ from typing import Optional, Callable, Tuple, Any, Dict
 
 from huggingface_hub import snapshot_download
 
+# Import USER_SUPPORT_DIR for proper OSX user directory
+from cdmf_paths import USER_SUPPORT_DIR
+
 # Hugging Face repo for MuFun-ACEStep
 MUFUN_REPO_ID = "Yi3852/MuFun-ACEStep"
 
-# Local cache root for MuFun under the AceForge app directory.
+# Local cache root for MuFun under the user Application Support directory.
 # Layout will look like:
-#   models/mufun_acestep/
+#   ~/Library/Application Support/AceForge/models/mufun_acestep/
 #     blobs/
 #     models--Yi3852--MuFun-ACEStep/
-MUFUN_CACHE_ROOT = Path(__file__).resolve().parent / "models" / "mufun_acestep"
+MUFUN_CACHE_ROOT = USER_SUPPORT_DIR / "models" / "mufun_acestep"
 
 ProgressCallback = Callable[[float], None]
 

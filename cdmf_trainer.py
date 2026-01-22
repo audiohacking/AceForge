@@ -31,6 +31,7 @@ from tqdm import tqdm
 import random
 import os
 from cdmf_pipeline_ace_step import ACEStepPipeline
+from cdmf_paths import USER_SUPPORT_DIR
 
 matplotlib.use("Agg")
 # Configure CUDA backends if available
@@ -1005,7 +1006,7 @@ class Pipeline(LightningModule):
     def _save_lora_adapter(self, tag: str) -> None:
         """
         Save the current LoRA adapter both into the run's checkpoint folder
-        and into a stable <APP_DIR>/custom_lora/<adapter_name> folder.
+        and into a stable <USER_SUPPORT_DIR>/custom_lora/<adapter_name> folder.
 
         This is a small, custom save that avoids Lightning's huge .ckpt blobs.
         """
@@ -1021,9 +1022,8 @@ class Pipeline(LightningModule):
             run_ckpt_dir, adapter_name=self.adapter_name
         )
 
-        # Stable copy under <APP_DIR>/custom_lora/<adapter_name>
-        app_dir = Path(__file__).resolve().parent
-        custom_root = app_dir / "custom_lora" / self.adapter_name
+        # Stable copy under <USER_SUPPORT_DIR>/custom_lora/<adapter_name>
+        custom_root = USER_SUPPORT_DIR / "custom_lora" / self.adapter_name
         os.makedirs(custom_root, exist_ok=True)
         self.transformers.save_lora_adapter(
             str(custom_root), adapter_name=self.adapter_name

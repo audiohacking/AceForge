@@ -7,17 +7,30 @@ import sys
 import json
 import os
 
+# Import user directories module for OSX-compliant paths
+from cdmf_user_dirs import (
+    get_app_dir,
+    get_user_preferences_dir,
+    get_user_app_support_dir,
+    ensure_user_directories
+)
+
 # ---------------------------------------------------------------------------
 # Core paths and directories (shared across modules)
 # ---------------------------------------------------------------------------
 
-if getattr(sys, "frozen", False):
-    APP_DIR = Path(sys.executable).resolve().parent
-else:
-    APP_DIR = Path(__file__).parent.resolve()
+# APP_DIR is now the bundled app directory (for reading bundled resources)
+APP_DIR = get_app_dir()
 
-# Configuration file for user settings
-CONFIG_PATH = APP_DIR / "aceforge_config.json"
+# Initialize user directories (including migration from legacy locations)
+ensure_user_directories()
+
+# Get user-specific directories following OSX conventions
+USER_PREFS_DIR = get_user_preferences_dir()
+USER_SUPPORT_DIR = get_user_app_support_dir()
+
+# Configuration file for user settings (now in Preferences)
+CONFIG_PATH = USER_PREFS_DIR / "aceforge_config.json"
 
 def load_config() -> dict:
     """Load configuration from aceforge_config.json or return defaults."""
@@ -39,7 +52,7 @@ def save_config(config: dict) -> None:
         print(f"[AceForge] Warning: Failed to save config: {e}", flush=True)
 
 def get_models_folder() -> Path:
-    """Get the configured models folder path, or default to APP_DIR / ace_models."""
+    """Get the configured models folder path, or default to user Application Support."""
     config = load_config()
     models_path = config.get("models_folder")
     if models_path:
@@ -52,8 +65,8 @@ def get_models_folder() -> Path:
             print(f"[AceForge] Warning: Cannot use configured models folder {models_path}: {e}", flush=True)
             print("[AceForge] Falling back to default models folder.", flush=True)
     
-    # Default path
-    default_path = APP_DIR / "ace_models"
+    # Default path is now in user Application Support
+    default_path = USER_SUPPORT_DIR / "ace_models"
     default_path.mkdir(parents=True, exist_ok=True)
     return default_path
 
@@ -76,29 +89,41 @@ def set_models_folder(path: str) -> bool:
         print(f"[AceForge] Error setting models folder: {e}", flush=True)
         return False
 
-# Where finished tracks go
-DEFAULT_OUT_DIR = str(APP_DIR / "generated")
+# Where finished tracks go (now in user Application Support)
+DEFAULT_OUT_DIR = str(USER_SUPPORT_DIR / "generated")
 
-# Presets / tracks metadata / user presets
-PRESETS_PATH = APP_DIR / "presets.json"
-TRACK_META_PATH = APP_DIR / "tracks_meta.json"
-USER_PRESETS_PATH = APP_DIR / "user_presets.json"
+# Presets / tracks metadata / user presets (now in user Preferences)
+# Try user preferences first, fall back to bundled presets for reading
+PRESETS_PATH = USER_PREFS_DIR / "presets.json"
+# If user presets don't exist, copy from bundled version
+if not PRESETS_PATH.exists():
+    bundled_presets = APP_DIR / "presets.json"
+    if bundled_presets.exists():
+        try:
+            import shutil
+            shutil.copy2(bundled_presets, PRESETS_PATH)
+        except Exception:
+            # If copy fails, just use bundled path for reading
+            PRESETS_PATH = bundled_presets
+
+TRACK_META_PATH = USER_PREFS_DIR / "tracks_meta.json"
+USER_PRESETS_PATH = USER_PREFS_DIR / "user_presets.json"
 
 # Shared location for ACE-Step base model weights used by the LoRA trainer.
-ACE_TRAINER_MODEL_ROOT = APP_DIR / "ace_models"
+ACE_TRAINER_MODEL_ROOT = USER_SUPPORT_DIR / "ace_models"
 ACE_TRAINER_MODEL_ROOT.mkdir(parents=True, exist_ok=True)
 
 # Root for all ACE-Step training datasets (LoRA + MuFun).
-TRAINING_DATA_ROOT = APP_DIR / "training_datasets"
+TRAINING_DATA_ROOT = USER_SUPPORT_DIR / "training_datasets"
 TRAINING_DATA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # Training configs (JSON files for LoRA hyperparameters)
-TRAINING_CONFIG_ROOT = APP_DIR / "training_config"
+TRAINING_CONFIG_ROOT = USER_SUPPORT_DIR / "training_config"
 TRAINING_CONFIG_ROOT.mkdir(parents=True, exist_ok=True)
 DEFAULT_LORA_CONFIG = TRAINING_CONFIG_ROOT / "default_config.json"
 
 # Where custom LoRA adapters live
-CUSTOM_LORA_ROOT = APP_DIR / "custom_lora"
+CUSTOM_LORA_ROOT = USER_SUPPORT_DIR / "custom_lora"
 CUSTOM_LORA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # Seed vibes (these should match ACE_VIBE_TAGS in generate_ace.py)

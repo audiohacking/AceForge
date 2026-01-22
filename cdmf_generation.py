@@ -19,6 +19,7 @@ import cdmf_state
 import cdmf_tracks
 from cdmf_paths import (
     APP_DIR,
+    USER_SUPPORT_DIR,
     DEFAULT_OUT_DIR,
     TRAINING_DATA_ROOT,
     CUSTOM_LORA_ROOT,
@@ -383,7 +384,7 @@ def create_generation_blueprint(
                     elif any(sep in manual_lora for sep in ("/", "\\")):
                         lora_name_or_path = manual_lora
                     else:
-                        lora_name_or_path = str(APP_DIR / "custom_lora" / manual_lora)
+                        lora_name_or_path = str(CUSTOM_LORA_ROOT / manual_lora)
 
             lora_weight_raw = request.form.get("lora_weight", "").strip()
             lora_weight = 0.75

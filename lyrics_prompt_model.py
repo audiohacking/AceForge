@@ -11,10 +11,10 @@ import torch
 from huggingface_hub import snapshot_download
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
-from cdmf_paths import APP_DIR
+from cdmf_paths import USER_SUPPORT_DIR
 
 # ---------------------------------------------------------------------------
-# Config: small-ish instruct model + local cache under <root>\models
+# Config: small-ish instruct model + local cache under <USER_SUPPORT_DIR>\models
 # ---------------------------------------------------------------------------
 
 # Default to Qwen 3B instruct; can be overridden via env.
@@ -31,7 +31,7 @@ _PIPELINE_LOCK = threading.Lock()
 
 def _ensure_pipeline():
     """
-    Lazily download + load the prompt/lyrics LLM into APP_DIR/models/LOCAL_SUBDIR
+    Lazily download + load the prompt/lyrics LLM into USER_SUPPORT_DIR/models/LOCAL_SUBDIR
     and return a cached text-generation pipeline.
 
     This model is *separate* from ACE-Step; it only lives in memory while
@@ -46,7 +46,7 @@ def _ensure_pipeline():
         if _PIPELINE is not None:
             return _PIPELINE
 
-        model_root: Path = APP_DIR / "models" / LOCAL_SUBDIR
+        model_root: Path = USER_SUPPORT_DIR / "models" / LOCAL_SUBDIR
         model_root.mkdir(parents=True, exist_ok=True)
 
         # Keep HF from spraying into a global .cache folder; confine to CDMF tree.

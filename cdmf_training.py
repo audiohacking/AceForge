@@ -16,6 +16,7 @@ from flask import Blueprint, jsonify, request
 from ace_model_setup import ace_models_present
 from cdmf_paths import (
     APP_DIR,
+    USER_SUPPORT_DIR,
     TRAINING_DATA_ROOT,
     ACE_TRAINER_MODEL_ROOT,
     TRAINING_CONFIG_ROOT,
@@ -167,7 +168,7 @@ def _start_lora_training(
     runs independently; we just stream its stdout/stderr into a log file.
 
     NOTE: dataset_path is interpreted as a folder name / relative path
-    under TRAINING_DATA_ROOT (APP_DIR / "training_datasets"), not as an
+    under TRAINING_DATA_ROOT (USER_SUPPORT_DIR / "training_datasets"), not as an
     arbitrary absolute path on the host filesystem. The raw folder is
     auto-converted into a HuggingFace `datasets` directory under
       <raw_folder> / "_hf_text2music"
@@ -234,9 +235,9 @@ def _start_lora_training(
     if not trainer_script.exists():
         return False, f"trainer.py not found at {trainer_script}"
 
-    # Training logs live under APP_DIR / ace_training / <exp_name>, but the
+    # Training logs live under USER_SUPPORT_DIR / ace_training / <exp_name>, but the
     # heavy ACE-Step base model weights are cached in a shared root folder.
-    train_root = APP_DIR / "ace_training"
+    train_root = USER_SUPPORT_DIR / "ace_training"
     exp_root = train_root / exp_name
     exp_root.mkdir(parents=True, exist_ok=True)
     log_path = exp_root / "trainer.log"
@@ -560,7 +561,7 @@ def _start_lora_training(
 
         if rc == 0:
             try:
-                train_root_local = APP_DIR / "ace_training"
+                train_root_local = USER_SUPPORT_DIR / "ace_training"
                 exp_root_local = train_root_local / exp
                 cleanup_dirs = [
                     exp_root_local / "checkpoints",

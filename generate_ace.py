@@ -161,15 +161,15 @@ DEFAULT_TARGET_SECONDS = 150.0
 DEFAULT_FADE_IN_SECONDS = 0.5
 DEFAULT_FADE_OUT_SECONDS = 0.5
 
-# Where this script lives
+# Where this script lives (for finding bundled resources)
 APP_DIR = Path(__file__).parent.resolve()
 
 # Force Hugging Face cache into the configured models folder
 HF_HOME = cdmf_paths.get_models_folder()
 os.environ.setdefault("HF_HOME", str(HF_HOME))
 
-# Default output root if none is explicitly provided
-DEFAULT_OUTPUT_ROOT = APP_DIR / "generated"
+# Default output root now in user Application Support
+DEFAULT_OUTPUT_ROOT = cdmf_paths.USER_SUPPORT_DIR / "generated"
 
 # Subfolder where ACE-Step input_params JSONs will be stored, relative to each
 # output directory (e.g. generated/input_params_record).

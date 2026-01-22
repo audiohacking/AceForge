@@ -13,7 +13,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from huggingface_hub import snapshot_download
 
-from cdmf_paths import APP_DIR
+from cdmf_paths import USER_SUPPORT_DIR
 
 ProgressCallback = Optional[Callable[[float], None]]
 
@@ -21,8 +21,8 @@ ProgressCallback = Optional[Callable[[float], None]]
 # Paths / model choice
 # ---------------------------------------------------------------------------
 
-# Root directory for all models / caches (kept inside the app folder).
-MODELS_ROOT = APP_DIR / "models"
+# Root directory for all models / caches (now in user Application Support).
+MODELS_ROOT = USER_SUPPORT_DIR / "models"
 
 # Default LLM for prompt/lyrics:
 # - Small enough to bundle reasonably
@@ -61,7 +61,7 @@ def ensure_lyrics_model(progress_cb: ProgressCallback = None) -> Path:
     Ensure that the lyrics LLM has been snapshot-downloaded to disk.
 
     Uses huggingface_hub.snapshot_download() with local_dir pointing at
-    <APP_DIR>/models/lyrics_qwen2_5_1_5b so nothing spills into the
+    <USER_SUPPORT_DIR>/models/prompt_lyrics so nothing spills into the
     default user-level ~/.cache.
     """
     MODELS_ROOT.mkdir(parents=True, exist_ok=True)
