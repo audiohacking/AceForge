@@ -100,20 +100,24 @@ jobs:
         
     - name: Verify models downloaded
       run: |
-        ls -la ace_models/checkpoints/ || echo "No checkpoints directory yet"
         python -c "
         from pathlib import Path
         import sys
-        from ace_model_setup import ACE_LOCAL_DIRNAME
+        from ace_model_setup import ACE_LOCAL_DIRNAME, get_ace_checkpoint_root
+        
+        # Get the actual checkpoint root directory (platform-aware)
+        checkpoint_root = get_ace_checkpoint_root()
+        print(f'Checking for models in: {checkpoint_root}')
         
         # Check if models directory exists
-        models_dir = Path('ace_models/checkpoints')
-        if not models_dir.exists():
-            print('✗ Models directory does not exist')
+        if not checkpoint_root.exists():
+            print(f'✗ Models directory does not exist at {checkpoint_root}')
             sys.exit(1)
+        
+        print(f'✓ Models directory exists at {checkpoint_root}')
             
         # Find the downloaded model repo directory (using ACE_LOCAL_DIRNAME from ace_model_setup.py)
-        ace_repo_dir = models_dir / ACE_LOCAL_DIRNAME
+        ace_repo_dir = checkpoint_root / ACE_LOCAL_DIRNAME
         if not ace_repo_dir.exists():
             print(f'✗ ACE-Step model directory not found at {ace_repo_dir}')
             sys.exit(1)
