@@ -20,7 +20,15 @@ try:
     import torch
 except ImportError as e:
     _IMPORT_ERRORS['torch'] = str(e)
-    torch = None
+    # Create a minimal torch mock with no_grad decorator
+    class _TorchMock:
+        @staticmethod
+        def no_grad():
+            """Fallback no-op decorator when torch is not available."""
+            def decorator(func):
+                return func
+            return decorator
+    torch = _TorchMock()
 
 try:
     from loguru import logger
@@ -139,15 +147,21 @@ try:
     from acestep.cpu_offload import cpu_offload
 except ImportError as e:
     _IMPORT_ERRORS['acestep.cpu_offload'] = str(e)
-    cpu_offload = None
+    # Provide a no-op decorator fallback if cpu_offload import fails
+    def cpu_offload(model_name):
+        """Fallback no-op decorator when acestep.cpu_offload is not available."""
+        def decorator(func):
+            return func
+        return decorator
 
 
 # Configure CUDA backends if available
-if torch.cuda.is_available():
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cuda.matmul.allow_tf32 = True
-torch.set_float32_matmul_precision("high")
+if not isinstance(torch, _TorchMock):
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+    torch.set_float32_matmul_precision("high")
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
