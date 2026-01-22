@@ -19,13 +19,22 @@ from flask import Flask, Response, request
 
 try:
     import diffusers.loaders as _cdmf_dl  # type: ignore[import]
+    
+    # Force the lazy module to fully initialize if it's a LazyModule
+    # This ensures our patches stick in frozen PyInstaller apps
+    # Accessing __dict__ triggers the lazy loading mechanism (assignment to trigger side effect)
+    _force_lazy_init = _cdmf_dl.__dict__
 
+    # Patch FromSingleFileMixin if not available at top level
     if not hasattr(_cdmf_dl, "FromSingleFileMixin"):
         try:
             from diffusers.loaders.single_file import (  # type: ignore[import]
                 FromSingleFileMixin as _CDMF_FSM,
             )
+            # Patch both the module and sys.modules to handle lazy loading
             _cdmf_dl.FromSingleFileMixin = _CDMF_FSM  # type: ignore[attr-defined]
+            if 'diffusers.loaders' in sys.modules:
+                sys.modules['diffusers.loaders'].FromSingleFileMixin = _CDMF_FSM  # type: ignore[attr-defined]
             print(
                 "[AceForge] Early-patched diffusers.loaders.FromSingleFileMixin "
                 "for ace-step.",
@@ -35,6 +44,35 @@ try:
             print(
                 "[AceForge] WARNING: Could not expose "
                 "diffusers.loaders.FromSingleFileMixin early: "
+                f"{_e}",
+                flush=True,
+            )
+    
+    # Patch IP Adapter mixins if not available at top level (critical for frozen apps)
+    if not hasattr(_cdmf_dl, "SD3IPAdapterMixin"):
+        try:
+            from diffusers.loaders.ip_adapter import (  # type: ignore[import]
+                IPAdapterMixin as _CDMF_IPAM,
+                SD3IPAdapterMixin as _CDMF_SD3IPAM,
+                FluxIPAdapterMixin as _CDMF_FLUXIPAM,
+            )
+            # Patch both the module and sys.modules to handle lazy loading
+            _cdmf_dl.IPAdapterMixin = _CDMF_IPAM  # type: ignore[attr-defined]
+            _cdmf_dl.SD3IPAdapterMixin = _CDMF_SD3IPAM  # type: ignore[attr-defined]
+            _cdmf_dl.FluxIPAdapterMixin = _CDMF_FLUXIPAM  # type: ignore[attr-defined]
+            if 'diffusers.loaders' in sys.modules:
+                sys.modules['diffusers.loaders'].IPAdapterMixin = _CDMF_IPAM  # type: ignore[attr-defined]
+                sys.modules['diffusers.loaders'].SD3IPAdapterMixin = _CDMF_SD3IPAM  # type: ignore[attr-defined]
+                sys.modules['diffusers.loaders'].FluxIPAdapterMixin = _CDMF_FLUXIPAM  # type: ignore[attr-defined]
+            print(
+                "[AceForge] Early-patched diffusers.loaders IP Adapter mixins "
+                "(IPAdapterMixin, SD3IPAdapterMixin, FluxIPAdapterMixin) for ace-step.",
+                flush=True,
+            )
+        except Exception as _e:
+            print(
+                "[AceForge] WARNING: Could not expose "
+                "diffusers.loaders IP Adapter mixins early: "
                 f"{_e}",
                 flush=True,
             )
