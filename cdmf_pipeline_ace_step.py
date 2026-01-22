@@ -10,52 +10,167 @@ import random
 import time
 import os
 import re
+import sys
 
-import torch
-from loguru import logger
-from tqdm import tqdm
+# Store import errors for better diagnostics in frozen apps
+_IMPORT_ERRORS = {}
+
+# Basic imports that should always work (json, math are standard)
+try:
+    import torch
+except ImportError as e:
+    _IMPORT_ERRORS['torch'] = str(e)
+    # Create a minimal torch mock with no_grad context manager
+    class _NoGradContext:
+        """Context manager fallback for torch.no_grad() when torch is not available."""
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+        def __call__(self, func):
+            """Allow use as decorator."""
+            return func
+    
+    class _TorchMock:
+        @staticmethod
+        def no_grad():
+            """Fallback context manager when torch is not available."""
+            return _NoGradContext()
+    
+    torch = _TorchMock()
+
+try:
+    from loguru import logger
+except ImportError as e:
+    _IMPORT_ERRORS['loguru'] = str(e)
+    logger = None
+
+try:
+    from tqdm import tqdm
+except ImportError as e:
+    _IMPORT_ERRORS['tqdm'] = str(e)
+    tqdm = None
+
 import json
 import math
-from huggingface_hub import snapshot_download
 
-# from diffusers.pipelines.pipeline_utils import DiffusionPipeline
-from acestep.schedulers.scheduling_flow_match_euler_discrete import (
-    FlowMatchEulerDiscreteScheduler,
-)
-from acestep.schedulers.scheduling_flow_match_heun_discrete import (
-    FlowMatchHeunDiscreteScheduler,
-)
-from acestep.schedulers.scheduling_flow_match_pingpong import (
-    FlowMatchPingPongScheduler,
-)
-from diffusers.pipelines.stable_diffusion_3.pipeline_stable_diffusion_3 import (
-    retrieve_timesteps,
-)
-from diffusers.utils.torch_utils import randn_tensor
-from diffusers.utils.peft_utils import set_weights_and_activate_adapters
-from transformers import UMT5EncoderModel, AutoTokenizer
+try:
+    from huggingface_hub import snapshot_download
+except ImportError as e:
+    _IMPORT_ERRORS['huggingface_hub'] = str(e)
+    snapshot_download = None
 
-from acestep.language_segmentation import LangSegment, language_filters
-from acestep.music_dcae.music_dcae_pipeline import MusicDCAE
-from acestep.models.ace_step_transformer import ACEStepTransformer2DModel
-from acestep.models.lyrics_utils.lyric_tokenizer import VoiceBpeTokenizer
-from acestep.apg_guidance import (
-    apg_forward,
-    MomentumBuffer,
-    cfg_forward,
-    cfg_zero_star,
-    cfg_double_condition_forward,
-)
-import torchaudio
-from acestep.cpu_offload import cpu_offload
+# Try to import diffusers and transformers (should be bundled)
+try:
+    from diffusers.pipelines.stable_diffusion_3.pipeline_stable_diffusion_3 import (
+        retrieve_timesteps,
+    )
+    from diffusers.utils.torch_utils import randn_tensor
+    from diffusers.utils.peft_utils import set_weights_and_activate_adapters
+except ImportError as e:
+    _IMPORT_ERRORS['diffusers'] = str(e)
+    retrieve_timesteps = None
+    randn_tensor = None
+    set_weights_and_activate_adapters = None
+
+try:
+    from transformers import UMT5EncoderModel, AutoTokenizer
+except ImportError as e:
+    _IMPORT_ERRORS['transformers'] = str(e)
+    UMT5EncoderModel = None
+    AutoTokenizer = None
+
+try:
+    import torchaudio
+except ImportError as e:
+    _IMPORT_ERRORS['torchaudio'] = str(e)
+    torchaudio = None
+
+# Import ACE-Step components with detailed error tracking
+try:
+    from acestep.schedulers.scheduling_flow_match_euler_discrete import (
+        FlowMatchEulerDiscreteScheduler,
+    )
+except ImportError as e:
+    _IMPORT_ERRORS['acestep.schedulers.euler'] = str(e)
+    FlowMatchEulerDiscreteScheduler = None
+
+try:
+    from acestep.schedulers.scheduling_flow_match_heun_discrete import (
+        FlowMatchHeunDiscreteScheduler,
+    )
+except ImportError as e:
+    _IMPORT_ERRORS['acestep.schedulers.heun'] = str(e)
+    FlowMatchHeunDiscreteScheduler = None
+
+try:
+    from acestep.schedulers.scheduling_flow_match_pingpong import (
+        FlowMatchPingPongScheduler,
+    )
+except ImportError as e:
+    _IMPORT_ERRORS['acestep.schedulers.pingpong'] = str(e)
+    FlowMatchPingPongScheduler = None
+
+try:
+    from acestep.language_segmentation import LangSegment, language_filters
+except ImportError as e:
+    _IMPORT_ERRORS['acestep.language_segmentation'] = str(e)
+    LangSegment = None
+    language_filters = None
+
+try:
+    from acestep.music_dcae.music_dcae_pipeline import MusicDCAE
+except ImportError as e:
+    _IMPORT_ERRORS['acestep.music_dcae'] = str(e)
+    MusicDCAE = None
+
+try:
+    from acestep.models.ace_step_transformer import ACEStepTransformer2DModel
+except ImportError as e:
+    _IMPORT_ERRORS['acestep.models.transformer'] = str(e)
+    ACEStepTransformer2DModel = None
+
+try:
+    from acestep.models.lyrics_utils.lyric_tokenizer import VoiceBpeTokenizer
+except ImportError as e:
+    _IMPORT_ERRORS['acestep.models.lyric_tokenizer'] = str(e)
+    VoiceBpeTokenizer = None
+
+try:
+    from acestep.apg_guidance import (
+        apg_forward,
+        MomentumBuffer,
+        cfg_forward,
+        cfg_zero_star,
+        cfg_double_condition_forward,
+    )
+except ImportError as e:
+    _IMPORT_ERRORS['acestep.apg_guidance'] = str(e)
+    apg_forward = None
+    MomentumBuffer = None
+    cfg_forward = None
+    cfg_zero_star = None
+    cfg_double_condition_forward = None
+
+try:
+    from acestep.cpu_offload import cpu_offload
+except ImportError as e:
+    _IMPORT_ERRORS['acestep.cpu_offload'] = str(e)
+    # Provide a no-op decorator fallback if cpu_offload import fails
+    def cpu_offload(model_name):
+        """Fallback no-op decorator when acestep.cpu_offload is not available."""
+        def decorator(func):
+            return func
+        return decorator
 
 
-# Configure CUDA backends if available
-if torch.cuda.is_available():
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cuda.matmul.allow_tf32 = True
-torch.set_float32_matmul_precision("high")
+# Configure CUDA backends if available (only if real torch is loaded)
+if hasattr(torch, 'cuda') and hasattr(torch, 'backends'):
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+    torch.set_float32_matmul_precision("high")
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
@@ -92,6 +207,50 @@ REPO_ID = "ACE-Step/ACE-Step-v1-3.5B"
 REPO_ID_QUANT = REPO_ID + "-q4-K-M" # ??? update this i guess
 
 
+def _check_required_imports():
+    """
+    Check if all required imports succeeded.
+    
+    This is called at ACEStepPipeline initialization to provide detailed
+    error messages in case of import failures (especially in frozen apps).
+    
+    Raises:
+        ImportError: If any required imports failed, with details about which ones.
+    """
+    if not _IMPORT_ERRORS:
+        return  # All imports succeeded
+    
+    is_frozen = getattr(sys, 'frozen', False)
+    
+    error_details = []
+    for module_name, error_msg in _IMPORT_ERRORS.items():
+        error_details.append(f"  - {module_name}: {error_msg}")
+    
+    if is_frozen:
+        error_message = (
+            "ACEStepPipeline cannot be initialized because some required modules "
+            "failed to import in the frozen app bundle.\n\n"
+            "This indicates the app was not built correctly or some dependencies "
+            "are missing from the bundle.\n\n"
+            "Failed imports:\n" + "\n".join(error_details) + "\n\n"
+            "Try downloading a fresh copy of AceForge from:\n"
+            "  https://github.com/audiohacking/AceForge/releases\n\n"
+            "If the problem persists, this may be a build issue."
+        )
+    else:
+        error_message = (
+            "ACEStepPipeline cannot be initialized because some required modules "
+            "failed to import.\n\n"
+            "Failed imports:\n" + "\n".join(error_details) + "\n\n"
+            "Make sure ace-step is installed correctly:\n"
+            '  pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps\n\n'
+            "And all dependencies are installed:\n"
+            "  pip install -r requirements_ace_macos.txt"
+        )
+    
+    raise ImportError(error_message)
+
+
 # class ACEStepPipeline(DiffusionPipeline):
 class ACEStepPipeline:
     def __init__(
@@ -107,6 +266,8 @@ class ACEStepPipeline:
         overlapped_decode=False,
         **kwargs,
     ):
+        # Check that all required imports succeeded before proceeding
+        _check_required_imports()
         if not checkpoint_dir:
             if persistent_storage_path is None:
                 checkpoint_dir = os.path.join(

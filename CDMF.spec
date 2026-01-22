@@ -37,6 +37,9 @@ a = Analysis(
         'torchvision',
         'flask',
         'waitress',
+        # Required by cdmf_pipeline_ace_step.py
+        'loguru',
+        'huggingface_hub',
         # ACE-Step wrapper module (imported with try/except in generate_ace.py)
         'cdmf_pipeline_ace_step',
         # Lyrics prompt model (lazily imported in cdmf_generation.py)

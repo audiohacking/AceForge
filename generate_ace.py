@@ -149,6 +149,8 @@ try:
 except Exception as e:  # import-time diagnostics only
     ACEStepPipeline = None  # type: ignore[assignment]
     _ACE_IMPORT_ERROR = e
+    # Print import error immediately for debugging frozen apps
+    print(f"[ACE] WARNING: Failed to import ACEStepPipeline: {type(e).__name__}: {e}", flush=True)
 
 # -----------------------------------------------------------------------------
 #  Basic config
@@ -340,6 +342,10 @@ def _get_ace_pipeline() -> "ACEStepPipeline":
         # Check if running as frozen app (macOS .app bundle)
         is_frozen = getattr(sys, 'frozen', False)
         
+        # Format error details
+        error_type = type(_ACE_IMPORT_ERROR).__name__ if _ACE_IMPORT_ERROR else "Unknown"
+        error_msg_detail = str(_ACE_IMPORT_ERROR) if _ACE_IMPORT_ERROR else "No error details available"
+        
         if is_frozen:
             # For frozen app, acestep should already be bundled
             error_msg = (
@@ -351,7 +357,7 @@ def _get_ace_pipeline() -> "ACEStepPipeline":
                 "- A dependency is missing or incompatible\n\n"
                 "Try downloading a fresh copy of AceForge from:\n"
                 "  https://github.com/audiohacking/AceForge/releases\n\n"
-                f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
+                f"Original import error ({error_type}):\n{error_msg_detail}"
             )
         else:
             # For running from source
@@ -362,7 +368,7 @@ def _get_ace_pipeline() -> "ACEStepPipeline":
                 '  pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps\n\n'
                 "Or run the setup using the launcher script (CDMF.sh / CDMF.bat) which\n"
                 "will handle all dependencies automatically.\n\n"
-                f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
+                f"Original import error ({error_type}):\n{error_msg_detail}"
             )
         
         raise RuntimeError(error_msg)
