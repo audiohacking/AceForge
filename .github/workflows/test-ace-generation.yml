@@ -1,8 +1,6 @@
 name: ACE-Step Generation Test
 
 on:
-  push:
-    branches: [ main, develop, copilot/** ]
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:

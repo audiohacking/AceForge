@@ -65,6 +65,16 @@ jobs:
         cp macos_terminal_launcher.sh dist/AceForge.app/Contents/MacOS/AceForge
         chmod +x dist/AceForge.app/Contents/MacOS/AceForge
         
+    - name: Code sign the app bundle
+      run: |
+        # Run the code signing script with ad-hoc signing (no certificate required for dev builds)
+        # This prevents the "app is damaged" warning that requires sudo xattr -cr
+        # For production releases, set MACOS_SIGNING_IDENTITY secret to your Developer ID
+        chmod +x build/macos/codesign.sh
+        ./build/macos/codesign.sh dist/AceForge.app
+      env:
+        MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY || '-' }}
+        
     - name: Create DMG (macOS disk image)
       run: |
         # Create a temporary directory for DMG contents

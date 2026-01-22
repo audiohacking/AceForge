@@ -44,7 +44,9 @@ python_embed/*
 # ---- Distro / installer staging outputs ----
 CDMF_Distro/
 dist/
-build/
+# Ignore build artifacts but keep build configuration
+build/*
+!build/macos/
 out/
 release/
 *.dmg
