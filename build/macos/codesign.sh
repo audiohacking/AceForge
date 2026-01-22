@@ -78,7 +78,7 @@ done
 
 # Sign all Python framework binaries if they exist
 if [ -d "$APP_PATH/Contents/Frameworks" ]; then
-    find "$APP_PATH/Contents/Frameworks" -type f -perm /111 -print0 | while IFS= read -r -d '' binary; do
+    find "$APP_PATH/Contents/Frameworks" -type f -perm -111 -print0 | while IFS= read -r -d '' binary; do
         sign_binary "$binary" || true
     done
 fi
