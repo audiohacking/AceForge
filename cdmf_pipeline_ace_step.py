@@ -15,19 +15,28 @@ import sys
 # Store import errors for better diagnostics in frozen apps
 _IMPORT_ERRORS = {}
 
-# Basic imports that should always work (torch, json, math are standard)
+# Basic imports that should always work (json, math are standard)
 try:
     import torch
 except ImportError as e:
     _IMPORT_ERRORS['torch'] = str(e)
-    # Create a minimal torch mock with no_grad decorator
+    # Create a minimal torch mock with no_grad context manager
+    class _NoGradContext:
+        """Context manager fallback for torch.no_grad() when torch is not available."""
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+        def __call__(self, func):
+            """Allow use as decorator."""
+            return func
+    
     class _TorchMock:
         @staticmethod
         def no_grad():
-            """Fallback no-op decorator when torch is not available."""
-            def decorator(func):
-                return func
-            return decorator
+            """Fallback context manager when torch is not available."""
+            return _NoGradContext()
+    
     torch = _TorchMock()
 
 try:
@@ -155,8 +164,8 @@ except ImportError as e:
         return decorator
 
 
-# Configure CUDA backends if available
-if not isinstance(torch, _TorchMock):
+# Configure CUDA backends if available (only if real torch is loaded)
+if hasattr(torch, 'cuda') and hasattr(torch, 'backends'):
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True

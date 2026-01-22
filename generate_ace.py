@@ -146,7 +146,6 @@ _ACE_IMPORT_ERROR = None  # <-- MUST exist before the try
 
 try:
     from cdmf_pipeline_ace_step import ACEStepPipeline
-    # Module imported successfully
 except Exception as e:  # import-time diagnostics only
     ACEStepPipeline = None  # type: ignore[assignment]
     _ACE_IMPORT_ERROR = e
