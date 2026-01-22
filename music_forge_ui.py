@@ -20,6 +20,7 @@ from flask import Flask, Response, request
 try:
     import diffusers.loaders as _cdmf_dl  # type: ignore[import]
 
+    # Patch FromSingleFileMixin if not available at top level
     if not hasattr(_cdmf_dl, "FromSingleFileMixin"):
         try:
             from diffusers.loaders.single_file import (  # type: ignore[import]
@@ -35,6 +36,30 @@ try:
             print(
                 "[AceForge] WARNING: Could not expose "
                 "diffusers.loaders.FromSingleFileMixin early: "
+                f"{_e}",
+                flush=True,
+            )
+    
+    # Patch IP Adapter mixins if not available at top level (critical for frozen apps)
+    if not hasattr(_cdmf_dl, "SD3IPAdapterMixin"):
+        try:
+            from diffusers.loaders.ip_adapter import (  # type: ignore[import]
+                IPAdapterMixin as _CDMF_IPAM,
+                SD3IPAdapterMixin as _CDMF_SD3IPAM,
+                FluxIPAdapterMixin as _CDMF_FLUXIPAM,
+            )
+            _cdmf_dl.IPAdapterMixin = _CDMF_IPAM  # type: ignore[attr-defined]
+            _cdmf_dl.SD3IPAdapterMixin = _CDMF_SD3IPAM  # type: ignore[attr-defined]
+            _cdmf_dl.FluxIPAdapterMixin = _CDMF_FLUXIPAM  # type: ignore[attr-defined]
+            print(
+                "[AceForge] Early-patched diffusers.loaders IP Adapter mixins "
+                "(IPAdapterMixin, SD3IPAdapterMixin, FluxIPAdapterMixin) for ace-step.",
+                flush=True,
+            )
+        except Exception as _e:
+            print(
+                "[AceForge] WARNING: Could not expose "
+                "diffusers.loaders IP Adapter mixins early: "
                 f"{_e}",
                 flush=True,
             )
