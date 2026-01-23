@@ -467,6 +467,11 @@ def main() -> None:
     is_frozen = getattr(sys, "frozen", False)
     use_pywebview = is_frozen  # Use pywebview for frozen apps (native experience)
 
+    # Configuration constants for pywebview mode
+    SERVER_SHUTDOWN_DELAY = 0.3  # Seconds to wait for graceful shutdown
+    SOCKET_CHECK_TIMEOUT = 0.5   # Socket connection timeout in seconds
+    KEEP_ALIVE_INTERVAL = 1      # Seconds between keep-alive checks
+
     if use_pywebview:
         # Use pywebview for native window experience
         try:
@@ -512,7 +517,7 @@ def main() -> None:
                 print("[AceForge] Window closed by user, shutting down...", flush=True)
                 shutdown_server()
                 # Brief pause to allow server.close() to complete gracefully
-                time.sleep(0.3)
+                time.sleep(SERVER_SHUTDOWN_DELAY)
                 sys.exit(0)
             
             # Start server thread as daemon (will exit when main thread exits)
@@ -528,7 +533,7 @@ def main() -> None:
             while waited < max_wait and not server_ready:
                 try:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    sock.settimeout(0.5)
+                    sock.settimeout(SOCKET_CHECK_TIMEOUT)
                     result = sock.connect_ex(('127.0.0.1', 5056))
                     sock.close()
                     if result == 0:
@@ -593,7 +598,7 @@ def main() -> None:
             server_running = False
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(0.5)
+                sock.settimeout(SOCKET_CHECK_TIMEOUT)
                 result = sock.connect_ex(('127.0.0.1', 5056))
                 sock.close()
                 server_running = (result == 0)
@@ -612,7 +617,7 @@ def main() -> None:
                 # Keep main thread alive (server is in background thread)
                 try:
                     while True:
-                        time.sleep(1)
+                        time.sleep(KEEP_ALIVE_INTERVAL)
                 except KeyboardInterrupt:
                     print("[AceForge] Interrupted by user", flush=True)
                     sys.exit(0)
