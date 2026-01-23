@@ -527,8 +527,13 @@ def main() -> None:
     
     # Only use pywebview if running music_forge_ui.py directly (not imported)
     # AND not in frozen app (frozen apps use aceforge_app.py)
+    # CRITICAL: If aceforge_app is loaded, NEVER use pywebview
     is_frozen = getattr(sys, "frozen", False)
     use_pywebview = is_frozen and not aceforge_app_loaded
+    
+    # ADDITIONAL SAFETY: Never use pywebview if aceforge_app is in sys.modules
+    if aceforge_app_loaded:
+        use_pywebview = False
 
     # Configuration constants for pywebview mode (only used when running directly)
     SERVER_SHUTDOWN_DELAY = 0.3  # Seconds to wait for graceful shutdown
@@ -537,6 +542,14 @@ def main() -> None:
 
     if use_pywebview:
         # Use pywebview for native window experience
+        # CRITICAL: Double-check that aceforge_app is NOT loaded before importing webview
+        if 'aceforge_app' in sys.modules:
+            # aceforge_app is loaded - this should never happen, but guard against it
+            print("[AceForge] CRITICAL: aceforge_app loaded but use_pywebview is True - this is a bug!", flush=True)
+            use_pywebview = False
+            serve(app, host="127.0.0.1", port=5056)
+            return
+        
         try:
             import webview
             from waitress import create_server

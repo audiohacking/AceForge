@@ -30,44 +30,61 @@ try:
 except Exception as e:
     print(f"[AceForge] WARNING: lzma initialization: {e}", flush=True)
 
-# Import Flask app from music_forge_ui
-from music_forge_ui import app
-
-# Import pywebview
+# Import pywebview FIRST and patch it BEFORE importing music_forge_ui
+# This ensures that even if music_forge_ui tries to use webview, it will be protected
 import webview
 
-# CRITICAL: Monkey-patch webview.start() to be a global singleton
-# This ensures webview.start() can ONLY be called once, even from other modules
+# CRITICAL: Singleton guards for webview operations
+# These ensure webview.create_window() and webview.start() can ONLY be called once
+# This must happen BEFORE importing music_forge_ui to protect against any webview usage there
 _original_webview_start = webview.start
+_original_webview_create_window = webview.create_window
 _webview_start_called = False
-_webview_start_lock = threading.Lock()
+_webview_window_created = False
+_webview_lock = threading.Lock()
 
 def _singleton_webview_start(*args, **kwargs):
-    """Singleton wrapper for webview.start() - prevents duplicate windows"""
+    """Singleton wrapper for webview.start() - prevents duplicate event loops"""
     global _webview_start_called
     
-    with _webview_start_lock:
+    with _webview_lock:
         if _webview_start_called:
-            print("[AceForge] CRITICAL: webview.start() already called - blocking duplicate window creation", flush=True)
-            import traceback
-            print(f"[AceForge] Blocked call stack:\n{''.join(traceback.format_stack()[-5:])}", flush=True)
-            return  # Block the call - webview is already running
+            # webview.start() already called - do nothing
+            return None
         
         _webview_start_called = True
-        print("[AceForge] webview.start() called (first time) - starting GUI event loop", flush=True)
         return _original_webview_start(*args, **kwargs)
 
-# Replace webview.start() with our singleton wrapper
+def _singleton_webview_create_window(*args, **kwargs):
+    """Singleton wrapper for webview.create_window() - prevents duplicate windows"""
+    global _webview_window_created
+    
+    with _webview_lock:
+        if _webview_window_created:
+            # Window already created - return existing window or None
+            if webview.windows:
+                return webview.windows[0]
+            return None
+        
+        _webview_window_created = True
+        return _original_webview_create_window(*args, **kwargs)
+
+# Replace webview functions with singleton wrappers IMMEDIATELY
+# This protects against any code that imports webview after this point
 webview.start = _singleton_webview_start
+webview.create_window = _singleton_webview_create_window
+
+# NOW import Flask app from music_forge_ui
+# If music_forge_ui tries to use webview, it will get the patched (protected) version
+from music_forge_ui import app
 
 # Server configuration
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 5056
 SERVER_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
 
-# Global singleton flags - ensure only one window is ever created
-_window_created = False
-_webview_started = False
+# Application state - managed by singleton guards above
+_app_initialized = False
 
 class WindowControlAPI:
     """API for window control operations (minimize, restore, etc.)"""
@@ -181,26 +198,22 @@ def start_flask_server():
         print(f"[AceForge] Flask server error: {e}", flush=True)
         raise
 
+# Global shutdown flag
+_shutting_down = False
+
 def main():
     """Main entry point: start Flask server and pywebview window"""
-    global _window_created, _webview_started
+    global _app_initialized, _shutting_down
     
-    # CRITICAL GUARD: Prevent multiple calls to main() or webview.start()
-    if _webview_started:
-        print("[AceForge] BLOCKED: webview.start() already called - preventing duplicate window", flush=True)
+    # CRITICAL GUARD: Prevent multiple initialization or initialization during shutdown
+    if _app_initialized or _shutting_down:
         return
     
-    # Guard: Ensure only one window is ever created
-    if _window_created:
-        print("[AceForge] BLOCKED: Window already created, not creating another", flush=True)
+    # Additional check: if webview is already running, don't initialize again
+    if _webview_start_called or len(webview.windows) > 0:
         return
     
-    if len(webview.windows) > 0:
-        print("[AceForge] BLOCKED: Window already exists, not creating another", flush=True)
-        _window_created = True
-        # Don't call webview.start() here - it should already be running
-        # If we get here, something is wrong - just return
-        return
+    _app_initialized = True
     
     # Start Flask server in background thread
     server_thread = threading.Thread(target=start_flask_server, daemon=True, name="FlaskServer")
@@ -220,47 +233,49 @@ def main():
     # Define window close handler for clean shutdown
     def on_window_closed():
         """Handle window close event - cleanup and exit"""
-        print("[AceForge] Window closed by user, shutting down...", flush=True)
+        global _app_initialized, _shutting_down
+        
+        # Prevent any re-initialization or duplicate shutdown calls
+        if _shutting_down:
+            return
+        _shutting_down = True
+        _app_initialized = False
         
         # Clean up all resources and release memory
         cleanup_resources()
         
-        # Give a brief moment for cleanup to complete
-        time.sleep(0.5)
-        
-        # Exit cleanly
-        print("[AceForge] Shutdown complete, exiting...", flush=True)
-        sys.exit(0)
+        # Exit immediately - no delays that could trigger re-initialization
+        # Use os._exit to bypass any cleanup handlers that might trigger re-init
+        os._exit(0)
     
     # Create pywebview window pointing to Flask server
-    # Only create if no windows exist and we haven't created one before
-    if len(webview.windows) == 0 and not _window_created:
-        window = webview.create_window(
-            title="AceForge - AI Music Generation",
-            url=SERVER_URL,
-            width=1400,
-            height=900,
-            min_size=(1000, 700),
-            resizable=True,
-            fullscreen=False,
-            on_top=False,
-            shadow=True,
-            js_api=window_api,  # Expose window control API to JavaScript
-        )
-        _window_created = True
-        
-        # Register window close event handler
-        try:
-            window.events.closed += on_window_closed
-        except Exception as e:
-            print(f"[AceForge] Warning: Could not register close handler: {e}", flush=True)
-            # Fallback: use atexit as backup
-            import atexit
-            atexit.register(cleanup_resources)
+    # The singleton wrapper ensures this can only be called once
+    window = webview.create_window(
+        title="AceForge - AI Music Generation",
+        url=SERVER_URL,
+        width=1400,
+        height=900,
+        min_size=(1000, 700),
+        resizable=True,
+        fullscreen=False,
+        on_top=False,
+        shadow=True,
+        js_api=window_api,  # Expose window control API to JavaScript
+    )
     
-    # Mark that webview.start() is about to be called
-    # The singleton wrapper will prevent duplicate calls from any module
-    _webview_started = True
+    if window is None:
+        # Window creation was blocked (already exists) - should not happen, but handle gracefully
+        print("[AceForge] ERROR: Window creation blocked but no window exists", flush=True)
+        sys.exit(1)
+    
+    # Register window close event handler
+    try:
+        window.events.closed += on_window_closed
+    except Exception as e:
+        print(f"[AceForge] Warning: Could not register close handler: {e}", flush=True)
+        # Fallback: use atexit as backup
+        import atexit
+        atexit.register(cleanup_resources)
     
     # Register atexit handler as backup cleanup
     import atexit
