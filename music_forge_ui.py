@@ -510,23 +510,27 @@ def main() -> None:
         flush=True,
     )
 
-    is_frozen = getattr(sys, "frozen", False)
-    # IMPORTANT: In frozen apps, aceforge_app.py handles pywebview
-    # CRITICAL FIX: NEVER use pywebview if aceforge_app is loaded (prevents duplicate windows)
+    # CRITICAL: In frozen apps, aceforge_app.py handles ALL window creation
+    # music_forge_ui.py should NEVER create windows when imported by aceforge_app.py
+    # This is a pure Flask server - no pywebview code here
     aceforge_app_loaded = 'aceforge_app' in sys.modules
     
-    # DEBUG: Log the decision to trace the bug
-    print(f"[AceForge] DEBUG music_forge_ui.main(): is_frozen={is_frozen}, aceforge_app_loaded={aceforge_app_loaded}, __name__={__name__}", flush=True)
+    # If aceforge_app is loaded, we're running in the frozen app
+    # In this case, aceforge_app.py handles all window creation
+    # music_forge_ui.py should ONLY serve Flask, never create windows
     if aceforge_app_loaded:
-        print(f"[AceForge] DEBUG: aceforge_app is loaded - DISABLING pywebview to prevent duplicate window", flush=True)
-        import traceback
-        print(f"[AceForge] DEBUG: Stack trace:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+        # Running in frozen app - aceforge_app.py handles windows
+        # Just start Flask server (blocking)
+        print("[AceForge] Running in frozen app mode - aceforge_app handles windows, starting Flask server only...", flush=True)
+        serve(app, host="127.0.0.1", port=5056)
+        return
     
-    # CRITICAL: If aceforge_app is loaded, NEVER use pywebview (it handles all windows)
-    # This prevents the duplicate window bug during model loading
-    use_pywebview = False if aceforge_app_loaded else (is_frozen and not aceforge_app_loaded)
+    # Only use pywebview if running music_forge_ui.py directly (not imported)
+    # AND not in frozen app (frozen apps use aceforge_app.py)
+    is_frozen = getattr(sys, "frozen", False)
+    use_pywebview = is_frozen and not aceforge_app_loaded
 
-    # Configuration constants for pywebview mode
+    # Configuration constants for pywebview mode (only used when running directly)
     SERVER_SHUTDOWN_DELAY = 0.3  # Seconds to wait for graceful shutdown
     SOCKET_CHECK_TIMEOUT = 0.5   # Socket connection timeout in seconds
     KEEP_ALIVE_INTERVAL = 1      # Seconds between keep-alive checks
