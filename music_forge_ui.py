@@ -10,6 +10,8 @@ import queue
 import logging
 import time
 import re
+import socket
+import webbrowser
 from io import StringIO
 
 # ---------------------------------------------------------------------------
@@ -526,7 +528,6 @@ def main() -> None:
             server_thread.start()
             
             # Wait for server to be ready (simple check with socket)
-            import socket
             max_wait = 5
             waited = 0
             server_ready = False
@@ -580,7 +581,6 @@ def main() -> None:
         except ImportError:
             # Fallback to browser if pywebview is not available
             print("[AceForge] pywebview not available, falling back to browser...", flush=True)
-            import webbrowser
             try:
                 webbrowser.open_new("http://127.0.0.1:5056/")
             except Exception:
@@ -593,8 +593,6 @@ def main() -> None:
             print(f"[AceForge] Error with pywebview: {e}", flush=True)
             print("[AceForge] Falling back to browser...", flush=True)
             # Check if server is already running before starting a new one
-            import socket
-            import webbrowser
             server_running = False
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -632,7 +630,6 @@ def main() -> None:
                 serve(app, host="127.0.0.1", port=5056)
     else:
         # Development mode: use browser
-        import webbrowser
         try:
             webbrowser.open_new("http://127.0.0.1:5056/")
         except Exception:
