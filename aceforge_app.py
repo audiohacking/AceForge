@@ -845,10 +845,12 @@ def main():
             out_dir = Path.cwd() / "generated"
 
         def url_for(endpoint: str, **kwargs) -> str:
-            # Static assets referenced by template
+            # Static assets referenced by template.
+            # The rendered HTML lives in ~/Library/Application Support/AceForge/ui,
+            # so we must use absolute file:// URLs back into the .app bundle.
             if endpoint == "static":
                 filename = kwargs.get("filename", "")
-                return filename
+                return _file_url(static_base / filename)
 
             # Fake endpoints for legacy JS (we shim fetch() in pywebview_bridge.js)
             if endpoint == "cdmf_generation.generate":
