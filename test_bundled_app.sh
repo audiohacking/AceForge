@@ -33,13 +33,22 @@ PYTHON_VERSION=$(python3 --version)
 echo "Python: $PYTHON_VERSION"
 echo ""
 
-# Step 1: Install dependencies (if not already installed)
+# Step 1: Check dependencies
 echo "Step 1: Checking dependencies..."
-if ! python3 -c "import pyinstaller" 2>/dev/null; then
-    echo "Installing PyInstaller..."
-    pip3 install pyinstaller==6.17.0
+if ! python3 -c "import PyInstaller" 2>/dev/null; then
+    echo "⚠ PyInstaller not found."
+    echo ""
+    echo "Please install PyInstaller first:"
+    echo "  pip3 install pyinstaller==6.17.0"
+    echo ""
+    echo "Or if you're using a virtual environment:"
+    echo "  source venv_ace/bin/activate"
+    echo "  pip install pyinstaller==6.17.0"
+    echo ""
+    exit 1
 else
-    echo "✓ PyInstaller already installed"
+    PYINSTALLER_VERSION=$(python3 -c "import PyInstaller; print(PyInstaller.__version__)" 2>/dev/null || echo "unknown")
+    echo "✓ PyInstaller found (version: $PYINSTALLER_VERSION)"
 fi
 
 # Step 2: Build the app bundle
