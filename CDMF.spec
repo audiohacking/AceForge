@@ -4,6 +4,9 @@
 import sys
 from pathlib import Path
 
+# Import PyInstaller utilities for collecting binaries
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
+
 block_cipher = None
 
 # Determine paths
@@ -13,12 +16,36 @@ training_config_dir = spec_root / 'training_config'
 ace_models_dir = spec_root / 'ace_models'
 icon_path = spec_root / 'build' / 'macos' / 'AceForge.icns'
 
+# Collect _lzma binary explicitly (critical for py3langid in frozen apps)
+# PyInstaller should auto-detect it, but we ensure it's included
+_lzma_binaries = []
+try:
+    # Try PyInstaller's collect_dynamic_libs first (most reliable)
+    _lzma_binaries = collect_dynamic_libs('_lzma')
+    if _lzma_binaries:
+        print(f"[CDMF.spec] Collected _lzma binaries via collect_dynamic_libs: {len(_lzma_binaries)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_dynamic_libs('_lzma') failed: {e}")
+    # Fallback: try to find it manually
+    try:
+        import _lzma
+        import importlib.util
+        _lzma_spec = importlib.util.find_spec('_lzma')
+        if _lzma_spec and _lzma_spec.origin:
+            _lzma_path = Path(_lzma_spec.origin)
+            if _lzma_path.exists():
+                _lzma_binaries.append((str(_lzma_path), '.'))
+                print(f"[CDMF.spec] Found _lzma binary manually at: {_lzma_path}")
+    except Exception as e2:
+        print(f"[CDMF.spec] WARNING: Manual _lzma binary search failed: {e2}")
+        # PyInstaller should still find it automatically, but log the warning
+
 a = Analysis(
     ['music_forge_ui.py'],
     pathex=[],
-    binaries=[
-        # Include _lzma shared library if available (required for lzma module on some systems)
-        # PyInstaller will automatically find and include it if present
+    binaries=_lzma_binaries + [
+        # _lzma binaries are collected above
+        # Additional binaries can be added here if needed
     ],
     datas=[
         # Include static files (HTML, CSS, JS, images)
@@ -85,7 +112,7 @@ a = Analysis(
         'lzma',  # Required by py3langid for loading pickled models
         '_lzma',  # C extension for lzma (required on some systems)
     ],
-    hookspath=[],
+    hookspath=['build/macos/pyinstaller_hooks'],  # Custom hooks for frozen app compatibility
     hooksconfig={},
     runtime_hooks=[],
     excludes=[

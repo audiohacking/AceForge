@@ -14,6 +14,34 @@ from io import StringIO
 from flask import Flask, Response, request
 
 # ---------------------------------------------------------------------------
+# Early module imports for frozen app compatibility
+# ---------------------------------------------------------------------------
+
+# Import lzma early to ensure it's available for py3langid
+# This is critical for frozen PyInstaller apps where the _lzma C extension
+# might not be properly initialized if imported lazily
+try:
+    import lzma
+    import _lzma  # C extension - ensure it's loaded
+    # Test that lzma actually works
+    try:
+        # Quick test to ensure lzma is functional
+        test_data = b"test"
+        compressed = lzma.compress(test_data)
+        decompressed = lzma.decompress(compressed)
+        if decompressed == test_data:
+            print("[AceForge] lzma module initialized successfully for py3langid.", flush=True)
+        else:
+            print("[AceForge] WARNING: lzma module test failed.", flush=True)
+    except Exception as e:
+        print(f"[AceForge] WARNING: lzma module test failed: {e}", flush=True)
+except ImportError as e:
+    print(f"[AceForge] WARNING: Failed to import lzma module: {e}", flush=True)
+    print("[AceForge] Language detection may fail in frozen app.", flush=True)
+except Exception as e:
+    print(f"[AceForge] WARNING: Unexpected error initializing lzma: {e}", flush=True)
+
+# ---------------------------------------------------------------------------
 # Diffusers / ace-step compatibility shim (early)
 # ---------------------------------------------------------------------------
 

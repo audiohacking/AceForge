@@ -440,9 +440,47 @@ class ACEStepPipeline:
         if self.torch_compile:
             self.music_dcae = torch.compile(self.music_dcae)
 
-        lang_segment = LangSegment()
-        lang_segment.setfilters(language_filters.default)
-        self.lang_segment = lang_segment
+        # Initialize LangSegment with error handling for frozen app compatibility
+        # LangSegment uses py3langid which requires lzma for loading pickled models
+        try:
+            # Pre-import lzma to ensure it's available (helps with PyInstaller bundling)
+            try:
+                import lzma
+                import _lzma
+                # Quick test to ensure lzma is functional
+                test_compressed = lzma.compress(b"test")
+                lzma.decompress(test_compressed)
+            except Exception as lzma_err:
+                logger.warning(
+                    f"lzma module test failed before LangSegment init: {lzma_err}. "
+                    "LangSegment initialization may fail."
+                )
+            
+            lang_segment = LangSegment()
+            lang_segment.setfilters(language_filters.default)
+            self.lang_segment = lang_segment
+        except Exception as lang_err:
+            error_msg = str(lang_err)
+            # Check if it's an lzma-related error
+            if 'lzma' in error_msg.lower() or '_lzma' in error_msg.lower():
+                logger.error(
+                    f"Failed to initialize LangSegment due to lzma error: {error_msg}\n"
+                    "This is likely a PyInstaller bundling issue. The _lzma C extension "
+                    "may not be properly included in the frozen app bundle.\n"
+                    "Language detection will be disabled."
+                )
+            else:
+                logger.warning(
+                    f"Failed to initialize LangSegment: {error_msg}. "
+                    "Language detection will be disabled."
+                )
+            # Create a dummy lang_segment that always returns 'en'
+            class DummyLangSegment:
+                def getTexts(self, text):
+                    return []
+                def getCounts(self):
+                    return [('en', 1)]
+            self.lang_segment = DummyLangSegment()
         self.lyric_tokenizer = VoiceBpeTokenizer()
 
         text_encoder_model = UMT5EncoderModel.from_pretrained(
@@ -547,9 +585,45 @@ class ACEStepPipeline:
             text_encoder_checkpoint_path
         )
 
-        lang_segment = LangSegment()
-        lang_segment.setfilters(language_filters.default)
-        self.lang_segment = lang_segment
+        # Initialize LangSegment with error handling (same as in load_checkpoint)
+        try:
+            # Pre-import lzma to ensure it's available
+            try:
+                import lzma
+                import _lzma
+                test_compressed = lzma.compress(b"test")
+                lzma.decompress(test_compressed)
+            except Exception as lzma_err:
+                logger.warning(
+                    f"lzma module test failed before LangSegment init: {lzma_err}. "
+                    "LangSegment initialization may fail."
+                )
+            
+            lang_segment = LangSegment()
+            lang_segment.setfilters(language_filters.default)
+            self.lang_segment = lang_segment
+        except Exception as lang_err:
+            error_msg = str(lang_err)
+            if 'lzma' in error_msg.lower() or '_lzma' in error_msg.lower():
+                logger.error(
+                    f"Failed to initialize LangSegment due to lzma error: {error_msg}\n"
+                    "This is likely a PyInstaller bundling issue. The _lzma C extension "
+                    "may not be properly included in the frozen app bundle.\n"
+                    "Language detection will be disabled."
+                )
+            else:
+                logger.warning(
+                    f"Failed to initialize LangSegment: {error_msg}. "
+                    "Language detection will be disabled."
+                )
+            # Create a dummy lang_segment that always returns 'en'
+            class DummyLangSegment:
+                def getTexts(self, text):
+                    return []
+                def getCounts(self):
+                    return [('en', 1)]
+            self.lang_segment = DummyLangSegment()
+        
         self.lyric_tokenizer = VoiceBpeTokenizer()
 
         self.loaded = True
