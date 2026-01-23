@@ -119,6 +119,58 @@ def wait_for_server(max_wait=30):
         waited += 0.5
     return False
 
+def cleanup_resources():
+    """Clean up all resources and release memory before shutdown"""
+    print("[AceForge] Cleaning up resources and releasing memory...", flush=True)
+    
+    try:
+        # Clean up ACE-Step pipeline if it exists
+        try:
+            import generate_ace
+            # Access the module-level globals
+            if hasattr(generate_ace, '_ACE_PIPELINE') and hasattr(generate_ace, '_ACE_PIPELINE_LOCK'):
+                with generate_ace._ACE_PIPELINE_LOCK:
+                    if generate_ace._ACE_PIPELINE is not None:
+                        print("[AceForge] Cleaning up ACE-Step pipeline...", flush=True)
+                        try:
+                            # Call cleanup_memory to release GPU/CPU memory
+                            generate_ace._ACE_PIPELINE.cleanup_memory()
+                        except Exception as e:
+                            print(f"[AceForge] Warning: Error during pipeline cleanup: {e}", flush=True)
+                        
+                        # Clear the global pipeline reference
+                        generate_ace._ACE_PIPELINE = None
+                        print("[AceForge] ACE-Step pipeline released", flush=True)
+        except ImportError:
+            pass  # generate_ace not available
+        except Exception as e:
+            print(f"[AceForge] Warning: Error accessing pipeline: {e}", flush=True)
+        
+        # Clear PyTorch caches
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                print("[AceForge] CUDA cache cleared", flush=True)
+            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                try:
+                    torch.mps.empty_cache()
+                    print("[AceForge] MPS cache cleared", flush=True)
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[AceForge] Warning: Error clearing PyTorch cache: {e}", flush=True)
+        
+        # Force garbage collection
+        import gc
+        gc.collect()
+        print("[AceForge] Garbage collection completed", flush=True)
+        
+    except Exception as e:
+        print(f"[AceForge] Warning: Error during cleanup: {e}", flush=True)
+    
+    print("[AceForge] Resource cleanup completed", flush=True)
+
 def start_flask_server():
     """Start Flask server in background thread"""
     from waitress import serve
@@ -165,6 +217,21 @@ def main():
     # Create API instance for window controls
     window_api = WindowControlAPI()
     
+    # Define window close handler for clean shutdown
+    def on_window_closed():
+        """Handle window close event - cleanup and exit"""
+        print("[AceForge] Window closed by user, shutting down...", flush=True)
+        
+        # Clean up all resources and release memory
+        cleanup_resources()
+        
+        # Give a brief moment for cleanup to complete
+        time.sleep(0.5)
+        
+        # Exit cleanly
+        print("[AceForge] Shutdown complete, exiting...", flush=True)
+        sys.exit(0)
+    
     # Create pywebview window pointing to Flask server
     # Only create if no windows exist and we haven't created one before
     if len(webview.windows) == 0 and not _window_created:
@@ -181,17 +248,30 @@ def main():
             js_api=window_api,  # Expose window control API to JavaScript
         )
         _window_created = True
+        
+        # Register window close event handler
+        try:
+            window.events.closed += on_window_closed
+        except Exception as e:
+            print(f"[AceForge] Warning: Could not register close handler: {e}", flush=True)
+            # Fallback: use atexit as backup
+            import atexit
+            atexit.register(cleanup_resources)
     
     # Mark that webview.start() is about to be called
     # The singleton wrapper will prevent duplicate calls from any module
     _webview_started = True
     
+    # Register atexit handler as backup cleanup
+    import atexit
+    atexit.register(cleanup_resources)
+    
     # Start the GUI event loop (only once - this is a blocking call)
     # The singleton wrapper ensures this can only be called once globally
     webview.start(debug=False)
     
-    # Cleanup after window closes
-    print("[AceForge] Window closed, exiting...", flush=True)
+    # This should not be reached (on_window_closed exits), but just in case
+    cleanup_resources()
     sys.exit(0)
 
 
