@@ -203,7 +203,23 @@ app.register_blueprint(create_tracks_blueprint())
 app.register_blueprint(create_models_blueprint())
 app.register_blueprint(create_mufun_blueprint())
 app.register_blueprint(create_training_blueprint())
-app.register_blueprint(create_generation_blueprint())
+
+# Create UI defaults dict for generation blueprint
+ui_defaults = {
+    "target_seconds": DEFAULT_TARGET_SECONDS,
+    "fade_in": DEFAULT_FADE_IN_SECONDS,
+    "fade_out": DEFAULT_FADE_OUT_SECONDS,
+    "steps": 55,
+    "guidance_scale": 6.0,
+    "vocal_gain_db": 0.0,
+    "instrumental_gain_db": 0.0,
+}
+
+app.register_blueprint(create_generation_blueprint(
+    html_template=HTML,
+    ui_defaults=ui_defaults,
+    generate_track_ace=generate_track_ace,
+))
 app.register_blueprint(create_lyrics_blueprint())
 
 # ---------------------------------------------------------------------------
