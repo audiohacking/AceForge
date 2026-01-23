@@ -532,7 +532,6 @@ def main() -> None:
     # ADDITIONAL SAFETY: Never use pywebview if aceforge_app is in sys.modules
     # This check must happen BEFORE any webview import
     if aceforge_app_loaded:
-        print("[AceForge] CRITICAL: aceforge_app loaded - BLOCKING all webview usage in music_forge_ui", flush=True)
         use_pywebview = False
         # Force Flask-only mode
         serve(app, host="127.0.0.1", port=5056)
