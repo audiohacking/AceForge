@@ -5,6 +5,7 @@ __pycache__/
 dist
 # ---- Virtual envs ----
 venv_ace/
+venv_test/
 .venv/
 venv/
 env/
@@ -69,6 +70,9 @@ Desktop.ini
 
 # ---- Logs ----
 *.log
+
+# ---- Test scripts ----
+check_pyinstaller_data_placement.py
 
 # ---- Secrets / env ----
 .env
