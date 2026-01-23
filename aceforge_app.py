@@ -239,7 +239,8 @@ def main():
         
         for event_name, handler in optional_handlers:
             try:
-                getattr(window.events, event_name) += handler
+                event_attr = getattr(window.events, event_name)
+                event_attr += handler
                 print(f"[AceForge] Registered {event_name} handler", flush=True)
             except Exception as e:
                 print(f"[AceForge] Warning: Could not register {event_name}: {e}", flush=True)
