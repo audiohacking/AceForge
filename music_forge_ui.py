@@ -168,6 +168,9 @@ from cdmf_training import create_training_blueprint
 from cdmf_generation import create_generation_blueprint
 from cdmf_lyrics import create_lyrics_blueprint
 
+# Global flag to prevent main() from running when imported
+_MUSIC_FORGE_UI_IMPORTED = False
+
 # Flask app - configure static folder for frozen apps
 if getattr(sys, 'frozen', False):
     # In frozen app, static files are in Resources/static/
@@ -183,6 +186,9 @@ if getattr(sys, 'frozen', False):
 else:
     # Development mode - use default static folder
     app = Flask(__name__)
+
+# Mark that this module has been imported (not run directly)
+_MUSIC_FORGE_UI_IMPORTED = True
 
 # ---------------------------------------------------------------------------
 # Log streaming infrastructure
@@ -454,9 +460,25 @@ def main() -> None:
     Legacy main function - only used when music_forge_ui.py is run directly.
     When imported by aceforge_app.py, this function should NOT be called.
     """
-    # Guard: If we're being imported (not run directly), don't execute
-    # This prevents aceforge_app.py from accidentally triggering this code
-    if not (__name__ == "__main__" or getattr(sys, '_called_from_test', False)):
+    # CRITICAL GUARD: Only execute if this file is run directly (not imported)
+    # This prevents aceforge_app.py or any other importer from triggering window creation
+    if __name__ != "__main__":
+        print(f"[AceForge] BLOCKED: music_forge_ui.main() called but __name__={__name__} (not '__main__')", flush=True)
+        return
+    
+    # Additional safety check: If this module was imported (not run directly), don't execute
+    # The _MUSIC_FORGE_UI_IMPORTED flag is set when the module is imported
+    if _MUSIC_FORGE_UI_IMPORTED and __name__ == "__main__":
+        # This is a weird case - module was imported but then run directly
+        # Still check if aceforge_app is loaded
+        if 'aceforge_app' in sys.modules:
+            print("[AceForge] BLOCKED: music_forge_ui.main() called but aceforge_app is loaded - skipping to prevent duplicate windows", flush=True)
+            return
+    
+    # Additional safety check: If aceforge_app is in sys.modules, we're being imported
+    # by aceforge_app.py and should NOT create windows
+    if 'aceforge_app' in sys.modules:
+        print("[AceForge] BLOCKED: music_forge_ui.main() called but aceforge_app is loaded - skipping to prevent duplicate windows", flush=True)
         return
     
     from waitress import serve
@@ -491,7 +513,9 @@ def main() -> None:
     is_frozen = getattr(sys, "frozen", False)
     # IMPORTANT: In frozen apps, aceforge_app.py handles pywebview
     # Only use pywebview here if NOT imported by aceforge_app.py
-    use_pywebview = is_frozen and not hasattr(sys.modules.get('aceforge_app', None), '__file__')
+    # Double-check: if aceforge_app exists in modules, don't use pywebview
+    aceforge_app_loaded = 'aceforge_app' in sys.modules
+    use_pywebview = is_frozen and not aceforge_app_loaded
 
     # Configuration constants for pywebview mode
     SERVER_SHUTDOWN_DELAY = 0.3  # Seconds to wait for graceful shutdown

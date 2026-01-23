@@ -43,6 +43,7 @@ SERVER_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
 
 # Global flag to ensure only one window is ever created
 _window_created = False
+_webview_started = False
 
 def wait_for_server(max_wait=30):
     """Wait for Flask server to be ready"""
@@ -73,18 +74,23 @@ def start_flask_server():
 
 def main():
     """Main entry point: start Flask server and pywebview window"""
-    global _window_created
+    global _window_created, _webview_started
+    
+    # CRITICAL GUARD: Prevent multiple calls to main() or webview.start()
+    if _webview_started:
+        print("[AceForge] BLOCKED: webview.start() already called - preventing duplicate window", flush=True)
+        return
     
     # Guard: Ensure only one window is ever created
     if _window_created:
-        print("[AceForge] WARNING: Window already created, not creating another", flush=True)
+        print("[AceForge] BLOCKED: Window already created, not creating another", flush=True)
         return
     
     if len(webview.windows) > 0:
-        print("[AceForge] WARNING: Window already exists, not creating another", flush=True)
+        print("[AceForge] BLOCKED: Window already exists, not creating another", flush=True)
         _window_created = True
-        # If window exists, just start the event loop
-        webview.start(debug=False)
+        # Don't call webview.start() here - it should already be running
+        # If we get here, something is wrong - just return
         return
     
     # Start Flask server in background thread
@@ -115,7 +121,11 @@ def main():
         )
         _window_created = True
     
-    # Start the GUI event loop (only once)
+    # CRITICAL: Mark that webview.start() is about to be called
+    # This prevents any subsequent calls from creating duplicate windows
+    _webview_started = True
+    
+    # Start the GUI event loop (only once - this is a blocking call)
     webview.start(debug=False)
     
     # Cleanup after window closes
