@@ -61,6 +61,8 @@ except ImportError as e:
     snapshot_download = None
 
 # Try to import diffusers and transformers (should be bundled)
+# Note: We're lenient about diffusers.loaders submodule issues (SD3LoraLoaderMixin, etc.)
+# as those are patched by the shim in music_forge_ui.py before this module is imported
 try:
     from diffusers.pipelines.stable_diffusion_3.pipeline_stable_diffusion_3 import (
         retrieve_timesteps,
@@ -68,10 +70,45 @@ try:
     from diffusers.utils.torch_utils import randn_tensor
     from diffusers.utils.peft_utils import set_weights_and_activate_adapters
 except ImportError as e:
-    _IMPORT_ERRORS['diffusers'] = str(e)
-    retrieve_timesteps = None
-    randn_tensor = None
-    set_weights_and_activate_adapters = None
+    error_msg = str(e)
+    # Check if this is a diffusers.loaders submodule issue that can be worked around
+    # The shim in music_forge_ui.py patches these mixins before imports happen
+    is_loaders_submodule_issue = (
+        'diffusers.loaders' in error_msg and 
+        any(mixin in error_msg for mixin in [
+            'SD3LoraLoaderMixin', 'FromSingleFileMixin', 
+            'SD3IPAdapterMixin', 'IPAdapterMixin'
+        ])
+    )
+    
+    if is_loaders_submodule_issue:
+        # This is a submodule issue that the shim handles - try individual imports
+        # as a fallback, but don't store as a fatal error
+        retrieve_timesteps = None
+        randn_tensor = None
+        set_weights_and_activate_adapters = None
+        try:
+            from diffusers.pipelines.stable_diffusion_3.pipeline_stable_diffusion_3 import (
+                retrieve_timesteps,
+            )
+        except ImportError:
+            pass
+        try:
+            from diffusers.utils.torch_utils import randn_tensor
+        except ImportError:
+            pass
+        try:
+            from diffusers.utils.peft_utils import set_weights_and_activate_adapters
+        except ImportError:
+            pass
+        # Don't store this as an error - _check_required_imports will filter it out
+        # if the individual imports also failed
+    else:
+        # Real import error, store it
+        _IMPORT_ERRORS['diffusers'] = error_msg
+        retrieve_timesteps = None
+        randn_tensor = None
+        set_weights_and_activate_adapters = None
 
 try:
     from transformers import UMT5EncoderModel, AutoTokenizer
@@ -214,6 +251,9 @@ def _check_required_imports():
     This is called at ACEStepPipeline initialization to provide detailed
     error messages in case of import failures (especially in frozen apps).
     
+    Note: We're lenient about diffusers.loaders submodule issues, as those
+    can be patched by the shim in music_forge_ui.py (SD3LoraLoaderMixin, etc.)
+    
     Raises:
         ImportError: If any required imports failed, with details about which ones.
     """
@@ -222,8 +262,26 @@ def _check_required_imports():
     
     is_frozen = getattr(sys, 'frozen', False)
     
-    error_details = []
+    # Filter out diffusers.loaders submodule errors that can be worked around
+    # These are patched by the shim in music_forge_ui.py
+    filtered_errors = {}
     for module_name, error_msg in _IMPORT_ERRORS.items():
+        # Skip diffusers.loaders submodule issues - these are handled by the shim
+        if module_name == 'diffusers' and 'diffusers.loaders' in error_msg:
+            if any(mixin in error_msg for mixin in ['SD3LoraLoaderMixin', 
+                                                     'FromSingleFileMixin',
+                                                     'SD3IPAdapterMixin',
+                                                     'IPAdapterMixin']):
+                # This is a submodule issue that the shim handles, skip it
+                continue
+        filtered_errors[module_name] = error_msg
+    
+    # If all errors were filtered out, we're good
+    if not filtered_errors:
+        return
+    
+    error_details = []
+    for module_name, error_msg in filtered_errors.items():
         error_details.append(f"  - {module_name}: {error_msg}")
     
     if is_frozen:

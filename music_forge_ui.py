@@ -76,6 +76,29 @@ try:
                 f"{_e}",
                 flush=True,
             )
+    
+    # Patch LoRA loader mixins if not available at top level (critical for frozen apps)
+    if not hasattr(_cdmf_dl, "SD3LoraLoaderMixin"):
+        try:
+            from diffusers.loaders.lora_pipeline import (  # type: ignore[import]
+                SD3LoraLoaderMixin as _CDMF_SD3LOL,
+            )
+            # Patch both the module and sys.modules to handle lazy loading
+            _cdmf_dl.SD3LoraLoaderMixin = _CDMF_SD3LOL  # type: ignore[attr-defined]
+            if 'diffusers.loaders' in sys.modules:
+                sys.modules['diffusers.loaders'].SD3LoraLoaderMixin = _CDMF_SD3LOL  # type: ignore[attr-defined]
+            print(
+                "[AceForge] Early-patched diffusers.loaders.SD3LoraLoaderMixin "
+                "for ace-step.",
+                flush=True,
+            )
+        except Exception as _e:
+            print(
+                "[AceForge] WARNING: Could not expose "
+                "diffusers.loaders.SD3LoraLoaderMixin early: "
+                f"{_e}",
+                flush=True,
+            )
 except Exception as _e:
     print(
         "[AceForge] WARNING: Failed to import diffusers.loaders "
