@@ -9,6 +9,7 @@ import threading
 import queue
 import logging
 import time
+import re
 from io import StringIO
 
 # ---------------------------------------------------------------------------
@@ -180,6 +181,18 @@ class QueueHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
+            
+            # Additional filtering at the handler level
+            msg_lower = msg.lower()
+            
+            # Filter out task queue warnings
+            if 'task queue depth' in msg_lower:
+                return
+            
+            # Filter out client disconnect messages
+            if 'client disconnected while serving' in msg_lower:
+                return
+            
             # Try to add to queue, drop if full
             try:
                 LOG_QUEUE.put_nowait(msg)
@@ -202,11 +215,43 @@ root_logger.setLevel(logging.INFO)
 
 # Also redirect stdout and stderr to logging
 class StreamToLogger:
-    """File-like object that redirects writes to a logger"""
+    """File-like object that redirects writes to a logger with filtering"""
     def __init__(self, logger, log_level=logging.INFO):
         self.logger = logger
         self.log_level = log_level
         self.linebuf = ''
+        self.last_progress = None  # Track last progress to avoid duplicates
+
+    def _should_filter(self, line):
+        """Filter out unwanted log messages"""
+        line_lower = line.lower()
+        
+        # Filter out task queue depth warnings
+        if 'task queue depth' in line_lower:
+            return True
+        
+        # Filter out client disconnect messages (too noisy)
+        if 'client disconnected while serving' in line_lower:
+            return True
+        
+        return False
+    
+    def _extract_progress(self, line):
+        """Extract progress bar information from tqdm output"""
+        # Match tqdm progress bar format: " 50%|#####     | 35/70 [05:13<00:52,  1.50s/it]"
+        progress_pattern = r'(\d+)%\s*\|\s*[#\s]+\|\s*(\d+)/(\d+)\s+\[([^\]]+)\]'
+        match = re.search(progress_pattern, line)
+        
+        if match:
+            percent = int(match.group(1))
+            current = int(match.group(2))
+            total = int(match.group(3))
+            time_info = match.group(4)
+            
+            # Format as clean progress message
+            return f"[Progress] {percent}% ({current}/{total} steps) - {time_info}"
+        
+        return None
 
     def write(self, buf):
         # Handle partial writes by buffering until we get a newline
@@ -216,7 +261,27 @@ class StreamToLogger:
         # Process complete lines (those ending with newline)
         for line in lines[:-1]:
             if line.endswith(('\n', '\r\n', '\r')):
-                self.logger.log(self.log_level, line.rstrip())
+                line_clean = line.rstrip()
+                
+                # Skip empty lines
+                if not line_clean:
+                    continue
+                
+                # Filter unwanted messages
+                if self._should_filter(line_clean):
+                    continue
+                
+                # Try to extract progress bar info
+                progress_msg = self._extract_progress(line_clean)
+                if progress_msg:
+                    # Only log if it's different from last progress (avoid duplicates)
+                    if progress_msg != self.last_progress:
+                        self.logger.log(logging.INFO, progress_msg)
+                        self.last_progress = progress_msg
+                    continue
+                
+                # Log other messages normally
+                self.logger.log(self.log_level, line_clean)
         
         # Keep any incomplete line in buffer
         if lines and not lines[-1].endswith(('\n', '\r\n', '\r')):
@@ -227,7 +292,15 @@ class StreamToLogger:
     def flush(self):
         # Flush any remaining buffered content
         if self.linebuf:
-            self.logger.log(self.log_level, self.linebuf.rstrip())
+            line_clean = self.linebuf.rstrip()
+            if line_clean and not self._should_filter(line_clean):
+                progress_msg = self._extract_progress(line_clean)
+                if progress_msg:
+                    if progress_msg != self.last_progress:
+                        self.logger.log(logging.INFO, progress_msg)
+                        self.last_progress = progress_msg
+                else:
+                    self.logger.log(self.log_level, line_clean)
             self.linebuf = ''
 
 # Redirect stdout and stderr to logging (for frozen app)
@@ -395,25 +468,30 @@ def main() -> None:
     is_frozen = getattr(sys, "frozen", False)
 
     # macOS-focused: Use webbrowser to open loading page or main URL
-    if is_frozen:
+    # Use a module-level flag to ensure browser only opens once
+    if is_frozen and not hasattr(main, '_browser_opened'):
         try:
+            # Set flag immediately to prevent multiple opens
+            main._browser_opened = True
+            
             static_root = Path(app.static_folder or (cdmf_paths.APP_DIR / "static"))
             loader_path = static_root / "loading.html"
 
+            # Use webbrowser.open_new() to ensure a new window, not a tab
             if loader_path.exists():
                 try:
-                    webbrowser.open(loader_path.as_uri())
+                    webbrowser.open_new(loader_path.as_uri())
                 except Exception:
-                    webbrowser.open("http://127.0.0.1:5056/")
+                    webbrowser.open_new("http://127.0.0.1:5056/")
             else:
-                webbrowser.open("http://127.0.0.1:5056/")
+                webbrowser.open_new("http://127.0.0.1:5056/")
         except Exception as e:
             print(
                 f"[AceForge] Failed to open browser automatically: {e}",
                 flush=True,
             )
             try:
-                webbrowser.open("http://127.0.0.1:5056/")
+                webbrowser.open_new("http://127.0.0.1:5056/")
             except Exception:
                 pass
 
