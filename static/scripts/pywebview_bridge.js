@@ -240,6 +240,46 @@
 
   // API wrapper that handles both pywebview and fetch fallback
   window.AceForgeAPI = {
+    // Window controls
+    minimize: async function() {
+      const api = getAPI();
+      if (api && api.minimize) {
+        try {
+          return await api.minimize();
+        } catch (error) {
+          console.error('[API] Minimize error:', error);
+          return { status: 'error', message: String(error) };
+        }
+      }
+      return { status: 'error', message: 'Window control not available' };
+    },
+    
+    restore: async function() {
+      const api = getAPI();
+      if (api && api.restore) {
+        try {
+          return await api.restore();
+        } catch (error) {
+          console.error('[API] Restore error:', error);
+          return { status: 'error', message: String(error) };
+        }
+      }
+      return { status: 'error', message: 'Window control not available' };
+    },
+    
+    maximize: async function() {
+      const api = getAPI();
+      if (api && api.maximize) {
+        try {
+          return await api.maximize();
+        } catch (error) {
+          console.error('[API] Maximize error:', error);
+          return { status: 'error', message: String(error) };
+        }
+      }
+      return { status: 'error', message: 'Window control not available' };
+    },
+    
     // Generation
     generate: async function(params) {
       const api = getAPI();
