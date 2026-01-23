@@ -23,6 +23,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
+    - name: Set version from release tag
+      run: |
+        if [ "${{ github.event_name }}" == "release" ]; then
+          # Extract version from release tag (e.g., "v1.0.4" from tag "v1.0.4")
+          VERSION="${{ github.event.release.tag_name }}"
+        else
+          # For workflow_dispatch, use the input version
+          VERSION="${{ github.event.inputs.version }}"
+        fi
+        echo "Setting version to: $VERSION"
+        echo "$VERSION" > VERSION
+        cat VERSION
+      
     - name: Set up Python
       uses: actions/setup-python@v5
       with:

@@ -8,7 +8,7 @@ HTML = r"""
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>AceForge (v0.1)</title>
+  <title>AceForge{% if version %} ({{ version }}){% endif %}</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='aceforge_logo.png') }}">
 
   <!-- External CSS instead of inline <style> -->
@@ -30,7 +30,7 @@ HTML = r"""
         </h1>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="cd-alpha">v0.1</span>
+        <span class="cd-alpha">{{ version or 'v0.1' }}</span>
         <button type="button" class="btn danger exit" id="btnExitApp" title="Exit AceForge">
           <span class="icon">🚪</span><span class="label">Exit</span>
         </button>

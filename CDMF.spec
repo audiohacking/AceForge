@@ -128,6 +128,8 @@ a = Analysis(
         (str(ace_models_dir / 'ACE_STEP_CHANGES.txt'), 'ace_models'),
         # Include presets
         ('presets.json', '.'),
+        # Include VERSION file (placed in MacOS directory for frozen apps)
+        ('VERSION', '.'),
     ] + _py3langid_data + _acestep_lyrics_data + _tokenizers_data,
     hiddenimports=[
         'diffusers',

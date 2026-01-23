@@ -181,3 +181,27 @@ SEED_VIBES = [
     ("cyberpunk", "Cyberpunk / Synthwave"),
     ("misc", "Misc / Other"),
 ]
+
+# ---------------------------------------------------------------------------
+# Version management
+# ---------------------------------------------------------------------------
+
+def get_app_version() -> str:
+    """
+    Read the application version from VERSION file.
+    Falls back to 'v0.1' if file doesn't exist or can't be read.
+    The VERSION file is updated by GitHub Actions during release builds.
+    """
+    version_file = APP_DIR / "VERSION"
+    if version_file.exists():
+        try:
+            with version_file.open("r", encoding="utf-8") as f:
+                version = f.read().strip()
+                if version:
+                    return version
+        except Exception as e:
+            print(f"[AceForge] Warning: Failed to read VERSION file: {e}", flush=True)
+    # Default fallback
+    return "v0.1"
+
+APP_VERSION = get_app_version()

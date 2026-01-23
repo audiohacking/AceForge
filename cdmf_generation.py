@@ -23,6 +23,7 @@ from cdmf_paths import (
     TRAINING_DATA_ROOT,
     CUSTOM_LORA_ROOT,
     SEED_VIBES,
+    APP_VERSION,
 )
 
 def _extract_first_json_object(text: str) -> Dict[str, Any]:
@@ -113,6 +114,7 @@ def create_generation_blueprint(
 
         return render_template_string(
             html_template,
+            version=APP_VERSION,
             # Let the frontend pick a random preset; start empty here.
             prompt="",
             negative_prompt="",
@@ -623,6 +625,7 @@ def create_generation_blueprint(
 
             return render_template_string(
                 html_template,
+                version=APP_VERSION,
                 prompt=prompt,
                 negative_prompt=negative_prompt,
                 target_seconds=target_seconds,
@@ -679,6 +682,7 @@ def create_generation_blueprint(
 
             return render_template_string(
                 html_template,
+                version=APP_VERSION,
                 prompt=prompt,
                 negative_prompt=negative_prompt,
                 target_seconds=request.form.get("target_seconds", "90"),

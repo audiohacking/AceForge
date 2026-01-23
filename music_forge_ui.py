@@ -160,6 +160,7 @@ from generate_ace import (
 from ace_model_setup import ace_models_present
 from cdmf_template import HTML
 import cdmf_paths
+from cdmf_paths import APP_VERSION
 import cdmf_state
 from cdmf_tracks import create_tracks_blueprint
 from cdmf_models import create_models_blueprint
@@ -503,7 +504,7 @@ def main() -> None:
                 )
 
     print(
-        "Starting AceForge (ACE-Step Edition v0.1) "
+        f"Starting AceForge (ACE-Step Edition {APP_VERSION}) "
         "on http://127.0.0.1:5056/ ...",
         flush=True,
     )
