@@ -37,7 +37,7 @@ except Exception as e:
 import cdmf_state
 import cdmf_tracks
 import cdmf_paths
-from generate_ace import generate_track_ace
+from generate_ace import generate_track_ace, register_progress_callback
 from ace_model_setup import ace_models_present, ensure_ace_models
 
 # ---------------------------------------------------------------------------
@@ -145,7 +145,6 @@ if getattr(sys, 'frozen', False):
     sys.stderr = StreamToLogger(logging.getLogger('STDERR'), logging.ERROR)
 
 # Wire ACE-Step progress callback
-from cdmf_state import register_progress_callback
 register_progress_callback(cdmf_state.ace_progress_callback)
 
 # Initialize model status

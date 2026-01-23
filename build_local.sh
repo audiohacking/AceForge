@@ -98,6 +98,22 @@ if [ ! -f "$BUNDLED_BIN" ]; then
     exit 1
 fi
 
+# Code sign the app bundle (critical for macOS)
+echo ""
+echo "[Build] Code signing app bundle..."
+if [ -f "${APP_DIR}/build/macos/codesign.sh" ]; then
+    chmod +x "${APP_DIR}/build/macos/codesign.sh"
+    MACOS_SIGNING_IDENTITY="-" "${APP_DIR}/build/macos/codesign.sh" "$BUNDLED_APP"
+    if [ $? -eq 0 ]; then
+        echo "[Build] ✓ Code signing completed"
+    else
+        echo "[Build] ⚠ Code signing had warnings, but continuing..."
+    fi
+else
+    echo "[Build] ⚠ WARNING: codesign.sh not found, skipping code signing"
+    echo "[Build]   App may show security warnings when launched"
+fi
+
 echo ""
 echo "=========================================="
 echo "✓ Build successful!"

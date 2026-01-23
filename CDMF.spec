@@ -140,10 +140,12 @@ a = Analysis(
         'diffusers.pipelines.stable_diffusion_3.pipeline_stable_diffusion_3',
         'diffusers.utils.torch_utils',
         'diffusers.utils.peft_utils',
-        'transformers',
+        # Collect all transformers submodules (critical for frozen apps)
+        *collect_submodules('transformers'),
         'torch',
         'torchaudio',
-        'torchvision',
+        # Collect all torchvision submodules (critical for transformers integration)
+        *collect_submodules('torchvision'),
         'flask',
         'waitress',
         'webview',  # pywebview for native window UI (imported as 'webview')
