@@ -168,8 +168,21 @@ from cdmf_training import create_training_blueprint
 from cdmf_generation import create_generation_blueprint
 from cdmf_lyrics import create_lyrics_blueprint
 
-# Flask app
-app = Flask(__name__)
+# Flask app - configure static folder for frozen apps
+if getattr(sys, 'frozen', False):
+    # In frozen app, static files are in Resources/static/
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller bundle
+        static_folder = Path(sys._MEIPASS) / 'static'
+        template_folder = Path(sys._MEIPASS) / 'static'  # Templates are also in static
+    else:
+        # Fallback
+        static_folder = Path(__file__).parent / 'static'
+        template_folder = Path(__file__).parent / 'static'
+    app = Flask(__name__, static_folder=str(static_folder), template_folder=str(template_folder))
+else:
+    # Development mode - use default static folder
+    app = Flask(__name__)
 
 # ---------------------------------------------------------------------------
 # Log streaming infrastructure
