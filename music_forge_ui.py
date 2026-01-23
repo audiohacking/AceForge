@@ -587,6 +587,7 @@ def main() -> None:
             print(f"[AceForge] Error with pywebview: {e}", flush=True)
             print("[AceForge] Falling back to browser...", flush=True)
             # Check if server is already running before starting a new one
+            import socket
             server_running = False
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
