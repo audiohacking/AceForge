@@ -105,12 +105,12 @@ fi
 # Step 2: Build the app bundle
 echo ""
 echo "Step 2: Building app bundle with PyInstaller..."
-if [ -d "dist/AceForge.app" ]; then
+if [ -d "dist/AceForge.app" ] || [ -d "dist/AceForge" ]; then
     echo "Removing existing build..."
-    rm -rf dist/AceForge.app
+    rm -rf dist/AceForge.app dist/AceForge build/AceForge
 fi
 
-$PYTHON_CMD -m PyInstaller CDMF.spec
+$PYTHON_CMD -m PyInstaller CDMF.spec --clean
 
 if [ ! -d "dist/AceForge.app" ]; then
     echo "✗ Build failed: dist/AceForge.app not found"
