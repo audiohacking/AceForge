@@ -69,16 +69,10 @@ def _singleton_webview_start(*args, **kwargs):
     
     with _webview_lock:
         if _webview_start_called:
-            # webview.start() already called - BLOCK and log the attempt
-            import traceback
-            print("[AceForge] BLOCKED: webview.start() called but already running", flush=True)
-            print(f"[AceForge] Blocked call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+            # webview.start() already called - silently block
             return None
         
         _webview_start_called = True
-        print("[AceForge] webview.start() called (first time) - starting GUI event loop", flush=True)
-        import traceback
-        print(f"[AceForge] webview.start() call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
         return _original_webview_start(*args, **kwargs)
 
 def _singleton_webview_create_window(*args, **kwargs):
@@ -87,19 +81,12 @@ def _singleton_webview_create_window(*args, **kwargs):
     
     with _webview_lock:
         if _webview_window_created:
-            # Window already created - BLOCK and log the attempt
-            import traceback
-            print("[AceForge] BLOCKED: webview.create_window() called but window already exists", flush=True)
-            print(f"[AceForge] Blocked call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
-            # Return existing window if available, otherwise None
+            # Window already created - return existing window or None
             if webview.windows:
                 return webview.windows[0]
             return None
         
         _webview_window_created = True
-        print("[AceForge] webview.create_window() called (first time) - creating window", flush=True)
-        import traceback
-        print(f"[AceForge] Window creation call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
         return _original_webview_create_window(*args, **kwargs)
 
 # Replace webview functions with singleton wrappers IMMEDIATELY
@@ -331,21 +318,12 @@ def main():
     
     # CRITICAL GUARD: Prevent multiple initialization or initialization during shutdown
     if _app_initialized or _shutting_down:
-        import traceback
-        print("[AceForge] BLOCKED: main() called but app already initialized or shutting down", flush=True)
-        print(f"[AceForge] Blocked main() call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
         return
     
     # Additional check: if webview is already running, don't initialize again
     if _webview_start_called or len(webview.windows) > 0:
-        import traceback
-        print("[AceForge] BLOCKED: main() called but webview already running", flush=True)
-        print(f"[AceForge] Blocked main() call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
         return
     
-    print("[AceForge] main() called - initializing app", flush=True)
-    import traceback
-    print(f"[AceForge] main() call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
     _app_initialized = True
     
     # Start Flask server in background thread

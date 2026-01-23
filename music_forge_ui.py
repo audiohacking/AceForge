@@ -464,9 +464,6 @@ def main() -> None:
     # CRITICAL GUARD: Only execute if this file is run directly (not imported)
     # This prevents aceforge_app.py or any other importer from triggering window creation
     if __name__ != "__main__":
-        print(f"[AceForge] BLOCKED: music_forge_ui.main() called but __name__={__name__} (not '__main__')", flush=True)
-        import traceback
-        print(f"[AceForge] music_forge_ui.main() call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
         return
     
     # Additional safety check: If this module was imported (not run directly), don't execute
@@ -561,9 +558,6 @@ def main() -> None:
         # CRITICAL: Double-check aceforge_app is NOT loaded before importing webview
         # If it is loaded, we should have already returned above, but check again as safety
         if 'aceforge_app' in sys.modules:
-            print("[AceForge] CRITICAL: aceforge_app detected during webview import - BLOCKING", flush=True)
-            import traceback
-            print(f"[AceForge] Blocked webview import call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
             serve(app, host="127.0.0.1", port=5056)
             return
         
@@ -647,16 +641,10 @@ def main() -> None:
             
             # CRITICAL: Final check before creating window - ensure aceforge_app is NOT loaded
             if 'aceforge_app' in sys.modules:
-                print("[AceForge] CRITICAL: aceforge_app detected before window creation - BLOCKING", flush=True)
-                import traceback
-                print(f"[AceForge] Blocked window creation call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
                 serve(app, host="127.0.0.1", port=5056)
                 return
             
             # Create window with native macOS styling
-            print("[AceForge] music_forge_ui.py creating window (should NOT happen if aceforge_app is loaded)", flush=True)
-            import traceback
-            print(f"[AceForge] music_forge_ui window creation call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
             webview.create_window(
                 title="AceForge - AI Music Generation",
                 url=window_url,
