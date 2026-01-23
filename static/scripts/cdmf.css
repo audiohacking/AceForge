@@ -8,14 +8,69 @@
 }
 body {
   margin: 0;
+  padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #020617;
   color: #e5e7eb;
+  width: 100%;
+  box-sizing: border-box;
 }
+
+html {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .page {
-  max-width: 960px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
   padding: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Two-column layout */
+.two-column-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  width: 100%;
+  margin-top: 16px;
+  box-sizing: border-box;
+}
+
+.column-left {
+  flex: 0 0 calc((100% - 20px) * 0.5);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.column-right {
+  flex: 0 0 calc((100% - 20px) * 0.5);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+/* Responsive: stack columns on smaller screens */
+@media (max-width: 1200px) {
+  .two-column-layout {
+    flex-direction: column;
+  }
+  
+  .column-left {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  
+  .column-right {
+    flex: 1 1 auto;
+    width: 100%;
+  }
 }
 h1 {
   font-size: 1.6rem;
@@ -96,6 +151,17 @@ p {
   padding: 16px 20px;
   box-shadow: 0 12px 30px rgba(15,23,42,0.6);
   margin-top: 16px;
+}
+
+/* Cards in right column should not have top margin (handled by column gap) */
+.column-right > .card {
+  margin-top: 0;
+}
+
+/* First card in left column after tabs should not have extra margin */
+.column-left > .tab-row + .card,
+.column-left > .tab-row + form.card {
+  margin-top: 0;
 }
 .row {
   display: flex;

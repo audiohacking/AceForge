@@ -291,11 +291,48 @@
     }
   };
 
+  // Sync output directory from Settings to hidden form field
+  window.CDMF.syncOutputDirectory = function() {
+    const settingsField = document.getElementById('out_dir_settings');
+    const formField = document.getElementById('out_dir');
+    
+    if (settingsField && formField) {
+      formField.value = settingsField.value;
+    }
+  };
+
+  // Initialize output directory sync on page load
+  function initOutputDirectorySync() {
+    const settingsField = document.getElementById('out_dir_settings');
+    const formField = document.getElementById('out_dir');
+    
+    if (settingsField && formField) {
+      // Sync initial value from form to settings (in case form has a different default)
+      settingsField.value = formField.value;
+      
+      // Ensure sync happens when settings panel is opened
+      const originalToggleSettings = window.CDMF.toggleSettings;
+      if (originalToggleSettings) {
+        window.CDMF.toggleSettings = function() {
+          originalToggleSettings();
+          // Sync when settings panel is opened
+          setTimeout(() => {
+            window.CDMF.syncOutputDirectory();
+          }, 100);
+        };
+      }
+    }
+  }
+
   // Initialize when DOM is ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initConsole);
+    document.addEventListener('DOMContentLoaded', function() {
+      initConsole();
+      initOutputDirectorySync();
+    });
   } else {
     initConsole();
+    initOutputDirectorySync();
   }
 
 })();

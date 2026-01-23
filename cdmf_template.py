@@ -37,229 +37,39 @@ HTML = r"""
       </div>
     </div>
 
-    <p class="tagline">
-      Generate unlimited custom music with a simple prompt and style presets via ACE-Step.
-    </p>
 
-    <!-- Console panel (collapsible) -->
-    <div class="card" id="consoleCard">
-      <div class="card-header-row" style="cursor:pointer;" onclick="CDMF.toggleConsole && CDMF.toggleConsole()">
-        <h2 style="margin:0;">
-          <span id="consoleToggleIcon">▼</span> Server Console
-        </h2>
-        <span class="small" style="opacity:0.7;">
-          Click to expand/collapse
-        </span>
-      </div>
-      <div id="consolePanel" style="display:none;">
-        <div id="consoleOutput" class="console-output"></div>
-        <div class="small" style="margin-top:8px;opacity:0.7;">
-          Real-time server logs. Useful for troubleshooting errors.
-        </div>
-      </div>
-    </div>
-
-    <!-- Settings panel (collapsible) -->
-    <div class="card" id="settingsCard">
-      <div class="card-header-row" style="cursor:pointer;" onclick="CDMF.toggleSettings && CDMF.toggleSettings()">
-        <h2 style="margin:0;">
-          <span id="settingsToggleIcon">▶</span> Settings
-        </h2>
-        <span class="small" style="opacity:0.7;">
-          Click to expand/collapse
-        </span>
-      </div>
-      <div id="settingsPanel" style="display:none;">
-        <div class="row">
-          <label for="modelsFolderInput">Models Folder</label>
-          <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;">
-            <div style="display:flex;gap:8px;align-items:center;min-width:0;">
-              <input
-                type="text"
-                id="modelsFolderInput"
-                placeholder="Path to models folder"
-                style="flex:1;min-width:0;">
-              <button type="button" class="btn secondary" onclick="CDMF.loadModelsFolder && CDMF.loadModelsFolder()">
-                Load Current
-              </button>
-              <button type="button" class="btn" onclick="CDMF.saveModelsFolder && CDMF.saveModelsFolder()">
-                Save
-              </button>
-            </div>
-            <div class="small" style="opacity:0.7;">
-              Specify where to store downloaded models. Changes take effect on next restart.
-              Leave empty to use default (<code>ace_models/</code> in the application directory).
-            </div>
-            <div id="modelsFolderStatus" class="small" style="display:none;margin-top:4px;"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Music player card -->
-    <div class="card">
-      <div class="card-header-row">
-        <h2>Music Player</h2>
-        <span class="small">
-          Folder: <code>{{ default_out_dir }}</code>
-        </span>
-      </div>
-
-      <div class="row">
-        <label for="trackListPanel">Tracks</label>
-        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;">
-
-          <div class="track-filter-row small">
-            <span>Filter by category:</span>
-            <div id="categoryFilters" class="category-filter-chips"></div>
-          </div>
-
-          <div id="trackListHeader" class="track-list-header">
-            <div class="track-header-cell track-header-fav">★</div>
-            <button type="button"
-                    class="track-header-cell track-header-name"
-                    data-sort-key="name">
-              Name
-            </button>
-            <button type="button"
-                    class="track-header-cell track-header-length"
-                    data-sort-key="seconds">
-              Length
-            </button>
-            <button type="button"
-                    class="track-header-cell track-header-category"
-                    data-sort-key="category">
-              Category
-            </button>
-            <button type="button"
-                    class="track-header-cell track-header-created"
-                    data-sort-key="created">
-              Created
-            </button>
-            <div class="track-header-cell track-header-actions"></div>
-          </div>
-
-          <div id="trackListPanel" class="track-list-panel">
-            {% if tracks %}
-              {% for name in tracks %}
-              <div class="track-row{% if current_track == name %} active{% endif %}"
-                   data-track-name="{{ name }}">
-                <button type="button"
-                        class="track-fav-btn"
-                        data-role="favorite"
-                        aria-label="Favorite">
-                  ★
-                </button>
-                <div class="track-main">
-                  <div class="track-name">
-                    {{ name[:-4] if name.lower().endswith('.wav') else name }}
-                  </div>
-                  <div class="track-meta">
-                    <span class="track-length" data-role="length-label"></span>
-                    <span class="track-category" data-role="category-label"></span>
-                  </div>
-                </div>
-                <div class="track-actions">
-                  <button type="button"
-                          class="track-delete-btn"
-                          data-role="delete"
-                          aria-label="Delete">
-                    🗑
-                  </button>
-                </div>
-              </div>
-              {% endfor %}
-            {% else %}
-              <div class="small">(No .wav files found yet)</div>
-            {% endif %}
-          </div>
-
-          <div class="small">
-            Tip: Click ★ to favorite, click a category pill or right-click a row to edit category.
-            Use the header to sort and the chips above to filter categories.
-          </div>
-
-          <!-- Hidden <select> used internally by the JS audio player logic -->
-          <select id="trackList" name="trackList" class="track-select-hidden">
-            {% if tracks %}
-              {% for name in tracks %}
-                <option value="{{ url_for('cdmf_tracks.serve_music', filename=name) }}"
-                        {% if current_track == name %}selected{% endif %}>
-                  {{ name[:-4] if name.lower().endswith('.wav') else name }}
-                </option>
-              {% endfor %}
-            {% else %}
-              <option value="">(No .wav files found yet)</option>
-            {% endif %}
-          </select>
-        </div>
-      </div>
-
-      <div class="progress-container">
-        <div class="time-row">
-          <span id="currentTimeLabel">0:00</span>
-          <span id="durationLabel">0:00</span>
-        </div>
-        <div class="seek-row">
-          <input id="progressSlider" type="range" min="0" max="0" value="0" step="0.01">
-        </div>
-      </div>
-
-      <div class="player-controls">
-        <div class="player-btn-row">
-          <button type="button" class="btn" id="btnRewind">
-            <span class="icon">⏮</span><span class="label">Rewind</span>
+    <!-- Two-column layout container -->
+    <div class="two-column-layout">
+      <!-- Left column: Generation and Training -->
+      <div class="column-left">
+        <!-- Mode tabs: Generate vs Training ---------------------------------- -->
+        <div class="tab-row" style="margin-top:16px;">
+          <button
+            type="button"
+            class="tab-btn tab-btn-active mode-tab-btn"
+            data-mode="generate"
+            onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('generate');">
+            Generate
           </button>
-          <button type="button" class="btn" id="btnPlay">
-            <span class="icon">▶</span><span class="label">Play</span>
-          </button>
-          <button type="button" class="btn" id="btnStop">
-            <span class="icon">⏹</span><span class="label">Stop</span>
-          </button>
-          <button type="button" class="btn" id="btnLoop">
-            <span class="icon">🔁</span><span class="label">Loop</span>
-          </button>
-          <button type="button" class="btn" id="btnMute">
-            <span class="icon">🔇</span><span class="label">Mute</span>
+          <button
+            type="button"
+            class="tab-btn mode-tab-btn"
+            data-mode="train"
+            onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('train');">
+            Training
           </button>
         </div>
-        <div style="flex:1;display:flex;align-items:center;gap:6px;min-width:160px;">
-          <span class="small">Volume</span>
-          <input id="volumeSlider" type="range" min="0" max="1" step="0.02" value="0.9" style="flex:1;">
-        </div>
-      </div>
 
-      <audio id="audioPlayer"></audio>
-    </div>
-
-    <!-- Mode tabs: Generate vs Training ---------------------------------- -->
-    <div class="tab-row" style="margin-top:16px;">
-      <button
-        type="button"
-        class="tab-btn tab-btn-active mode-tab-btn"
-        data-mode="generate"
-        onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('generate');">
-        Generate
-      </button>
-      <button
-        type="button"
-        class="tab-btn mode-tab-btn"
-        data-mode="train"
-        onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('train');">
-        Training
-      </button>
-    </div>
-
-    <!-- Generation form card (mode: generate) ----------------------------- -->
-    <form
-      id="generateForm"
-      class="card card-mode"
-      data-mode="generate"
-      method="post"
-      action="{{ url_for('cdmf_generation.generate') }}"
-      target="generation_frame"
-      enctype="multipart/form-data"
-      onsubmit="return CDMF.onSubmitForm(event)">
+        <!-- Generation form card (mode: generate) ----------------------------- -->
+        <form
+          id="generateForm"
+          class="card card-mode"
+          data-mode="generate"
+          method="post"
+          action="{{ url_for('cdmf_generation.generate') }}"
+          target="generation_frame"
+          enctype="multipart/form-data"
+          onsubmit="return CDMF.onSubmitForm(event)">
       <div class="card-header-row">
         <div style="flex:1;min-width:0;">
           <h2>Generate Track</h2>
@@ -803,12 +613,8 @@ HTML = r"""
         or click Save to capture the current settings. Delete removes the selected preset.
       </div>
 
-      <hr style="border:none;border-top:1px solid #111827;margin:12px 0;">
-
-      <div class="row">
-        <label for="out_dir">Output directory</label>
-        <input id="out_dir" name="out_dir" type="text" value="{{ out_dir or default_out_dir }}">
-      </div>
+      <!-- Hidden output directory field (synced with Settings panel) -->
+      <input id="out_dir" name="out_dir" type="hidden" value="{{ out_dir or default_out_dir }}">
 
       {% if short_message %}
       <div class="toast {{ 'error' if error else '' }}">
@@ -831,11 +637,11 @@ HTML = r"""
       <div class="footer">
         Tip: Start with 0.5–2.0s fade in/out. When “Instrumental” is checked, AceForge sends [inst] as the ACE-Step lyrics token so the model focuses on backing tracks. ACE-Step can generate up to ~4 minutes in one shot, so you don't need tiling or stitching here.
       </div>
-    </form>
+        </form>
 
-    <!-- Modal: Generate prompt / lyrics from concept -->
-    <div
-      id="autoPromptLyricsModal"
+        <!-- Modal: Generate prompt / lyrics from concept -->
+        <div
+          id="autoPromptLyricsModal"
       style="
         position:fixed;
         inset:0;
@@ -914,11 +720,11 @@ HTML = r"""
       </div>
     </div>
 
-    <!-- Training card: ACE-Step LoRA skeleton (mode: train) --------------- -->
-    <form
-      id="trainForm"
-      class="card card-mode"
-      data-mode="train"
+        <!-- Training card: ACE-Step LoRA skeleton (mode: train) --------------- -->
+        <form
+          id="trainForm"
+          class="card card-mode"
+          data-mode="train"
       method="post"
       action="{{ url_for('cdmf_training.train_lora') }}"
       target="training_frame"
@@ -1369,14 +1175,14 @@ HTML = r"""
         your GPU busy for a while. Keep the server console window open and watch
         it for detailed logs and errors.
       </div>
-    </form>
+        </form>
 
-    <!-- Dataset Mass Tagging card ----------------------------------------- -->
-    <div
-      id="datasetTagCard"
-      class="card card-mode"
-      data-mode="train"
-      style="display:none;">
+        <!-- Dataset Mass Tagging card ----------------------------------------- -->
+        <div
+          id="datasetTagCard"
+          class="card card-mode"
+          data-mode="train"
+          style="display:none;">
       <div class="card-header-row">
         <div style="flex:1;min-width:0;">
           <h2>Dataset Mass Tagging (Prompt / Lyrics Templates)</h2>
@@ -1480,13 +1286,13 @@ HTML = r"""
           </span>
         </div>
       </div>
-    </div>
+        </div>
 
-    <div
-      id="mufunCard"
-      class="card card-mode"
-      data-mode="train"
-      style="display:none;">
+        <div
+          id="mufunCard"
+          class="card card-mode"
+          data-mode="train"
+          style="display:none;">
       <div class="card-header-row">
         <div style="flex:1;min-width:0;">
           <h2>Experimental - Analyze Dataset with MuFun-ACEStep (Auto-Create Prompt/Lyric Files)</h2>
@@ -1622,7 +1428,211 @@ HTML = r"""
         </div>
       </div>
 
-    </div>
+        </div> <!-- /mufunCard -->
+      </div> <!-- /column-left -->
+
+      <!-- Right column: Music Player, Console, Settings -->
+      <div class="column-right">
+        <!-- Music player card -->
+        <div class="card">
+          <div class="card-header-row">
+            <h2>Music Player</h2>
+          </div>
+
+          <div class="row">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;">
+
+              <div class="track-filter-row small">
+                <span>Filter by category:</span>
+                <div id="categoryFilters" class="category-filter-chips"></div>
+              </div>
+
+              <div id="trackListHeader" class="track-list-header">
+                <div class="track-header-cell track-header-fav">★</div>
+                <button type="button"
+                        class="track-header-cell track-header-name"
+                        data-sort-key="name">
+                  Name
+                </button>
+                <button type="button"
+                        class="track-header-cell track-header-length"
+                        data-sort-key="seconds">
+                  Length
+                </button>
+                <button type="button"
+                        class="track-header-cell track-header-category"
+                        data-sort-key="category">
+                  Category
+                </button>
+                <button type="button"
+                        class="track-header-cell track-header-created"
+                        data-sort-key="created">
+                  Created
+                </button>
+                <div class="track-header-cell track-header-actions"></div>
+              </div>
+
+              <div id="trackListPanel" class="track-list-panel">
+                {% if tracks %}
+                  {% for name in tracks %}
+                  <div class="track-row{% if current_track == name %} active{% endif %}"
+                       data-track-name="{{ name }}">
+                    <button type="button"
+                            class="track-fav-btn"
+                            data-role="favorite"
+                            aria-label="Favorite">
+                      ★
+                    </button>
+                    <div class="track-main">
+                      <div class="track-name">
+                        {{ name[:-4] if name.lower().endswith('.wav') else name }}
+                      </div>
+                      <div class="track-meta">
+                        <span class="track-length" data-role="length-label"></span>
+                        <span class="track-category" data-role="category-label"></span>
+                      </div>
+                    </div>
+                    <div class="track-actions">
+                      <button type="button"
+                              class="track-delete-btn"
+                              data-role="delete"
+                              aria-label="Delete">
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="small">(No .wav files found yet)</div>
+                {% endif %}
+              </div>
+
+              <div class="small">
+                Tip: Click ★ to favorite, click a category pill or right-click a row to edit category.
+                Use the header to sort and the chips above to filter categories.
+              </div>
+
+              <!-- Hidden <select> used internally by the JS audio player logic -->
+              <select id="trackList" name="trackList" class="track-select-hidden">
+                {% if tracks %}
+                  {% for name in tracks %}
+                    <option value="{{ url_for('cdmf_tracks.serve_music', filename=name) }}"
+                            {% if current_track == name %}selected{% endif %}>
+                      {{ name[:-4] if name.lower().endswith('.wav') else name }}
+                    </option>
+                  {% endfor %}
+                {% else %}
+                  <option value="">(No .wav files found yet)</option>
+                {% endif %}
+              </select>
+            </div>
+          </div>
+
+          <div class="progress-container">
+            <div class="time-row">
+              <span id="currentTimeLabel">0:00</span>
+              <span id="durationLabel">0:00</span>
+            </div>
+            <div class="seek-row">
+              <input id="progressSlider" type="range" min="0" max="0" value="0" step="0.01">
+            </div>
+          </div>
+
+          <div class="player-controls">
+            <div class="player-btn-row">
+              <button type="button" class="btn" id="btnRewind">
+                <span class="icon">⏮</span><span class="label">Rewind</span>
+              </button>
+              <button type="button" class="btn" id="btnPlay">
+                <span class="icon">▶</span><span class="label">Play</span>
+              </button>
+              <button type="button" class="btn" id="btnStop">
+                <span class="icon">⏹</span><span class="label">Stop</span>
+              </button>
+              <button type="button" class="btn" id="btnLoop">
+                <span class="icon">🔁</span><span class="label">Loop</span>
+              </button>
+              <button type="button" class="btn" id="btnMute">
+                <span class="icon">🔇</span><span class="label">Mute</span>
+              </button>
+            </div>
+            <div style="flex:1;display:flex;align-items:center;gap:6px;min-width:160px;">
+              <span class="small">Volume</span>
+              <input id="volumeSlider" type="range" min="0" max="1" step="0.02" value="0.9" style="flex:1;">
+            </div>
+          </div>
+
+          <audio id="audioPlayer"></audio>
+        </div>
+
+        <!-- Console panel (collapsible) -->
+        <div class="card" id="consoleCard">
+          <div class="card-header-row" style="cursor:pointer;" onclick="CDMF.toggleConsole && CDMF.toggleConsole()">
+            <h2 style="margin:0;">
+              <span id="consoleToggleIcon">▼</span> Server Console
+            </h2>
+            <span class="small" style="opacity:0.7;">
+              Click to expand/collapse
+            </span>
+          </div>
+          <div id="consolePanel" style="display:none;">
+            <div id="consoleOutput" class="console-output"></div>
+            <div class="small" style="margin-top:8px;opacity:0.7;">
+              Real-time server logs. Useful for troubleshooting errors.
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings panel (collapsible) -->
+        <div class="card" id="settingsCard">
+          <div class="card-header-row" style="cursor:pointer;" onclick="CDMF.toggleSettings && CDMF.toggleSettings()">
+            <h2 style="margin:0;">
+              <span id="settingsToggleIcon">▶</span> Settings
+            </h2>
+            <span class="small" style="opacity:0.7;">
+              Click to expand/collapse
+            </span>
+          </div>
+          <div id="settingsPanel" style="display:none;">
+            <div class="row">
+              <label for="modelsFolderInput">Models Folder</label>
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;">
+                <div style="display:flex;gap:8px;align-items:center;min-width:0;">
+                  <input
+                    type="text"
+                    id="modelsFolderInput"
+                    placeholder="Path to models folder"
+                    style="flex:1;min-width:0;">
+                  <button type="button" class="btn secondary" onclick="CDMF.loadModelsFolder && CDMF.loadModelsFolder()">
+                    Load Current
+                  </button>
+                  <button type="button" class="btn" onclick="CDMF.saveModelsFolder && CDMF.saveModelsFolder()">
+                    Save
+                  </button>
+                </div>
+                <div class="small" style="opacity:0.7;">
+                  Specify where to store downloaded models. Changes take effect on next restart.
+                  Leave empty to use default (<code>ace_models/</code> in the application directory).
+                </div>
+                <div id="modelsFolderStatus" class="small" style="display:none;margin-top:4px;"></div>
+              </div>
+            </div>
+
+            <hr style="border:none;border-top:1px solid #111827;margin:16px 0 12px;">
+
+            <div class="row">
+              <label for="out_dir_settings">Output directory</label>
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;">
+                <input id="out_dir_settings" type="text" value="{{ out_dir or default_out_dir }}" style="flex:1;min-width:0;" onchange="CDMF.syncOutputDirectory && CDMF.syncOutputDirectory()" oninput="CDMF.syncOutputDirectory && CDMF.syncOutputDirectory()">
+                <div class="small" style="opacity:0.7;">
+                  Directory where generated tracks will be saved. Default: <code>{{ default_out_dir }}</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div> <!-- /column-right -->
+    </div> <!-- /two-column-layout -->
 
     <iframe id="generation_frame" name="generation_frame" style="display:none;"></iframe>
     <iframe id="training_frame" name="training_frame" style="display:none;"></iframe>
