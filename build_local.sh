@@ -98,17 +98,18 @@ if [ ! -f "$BUNDLED_BIN" ]; then
     exit 1
 fi
 
-# Add terminal launcher scripts (matching GitHub Actions workflow)
+# For serverless pywebview app, we don't need launcher scripts
+# The binary (AceForge_bin) should be the main executable
+# Rename it to AceForge for cleaner app bundle structure
 echo ""
-echo "[Build] Adding launcher scripts to app bundle..."
-if [ -f "${APP_DIR}/launch_in_terminal.sh" ]; then
-    cp "${APP_DIR}/launch_in_terminal.sh" "${BUNDLED_APP}/Contents/MacOS/"
-    chmod +x "${BUNDLED_APP}/Contents/MacOS/launch_in_terminal.sh"
-fi
-
-if [ -f "${APP_DIR}/macos_terminal_launcher.sh" ]; then
-    cp "${APP_DIR}/macos_terminal_launcher.sh" "${BUNDLED_APP}/Contents/MacOS/AceForge"
-    chmod +x "${BUNDLED_APP}/Contents/MacOS/AceForge"
+echo "[Build] Setting up app bundle executable..."
+if [ -f "${BUNDLED_BIN}" ]; then
+    # Create a symlink or copy so the app can be launched as "AceForge"
+    # The Info.plist CFBundleExecutable should point to "AceForge"
+    if [ ! -f "${BUNDLED_APP}/Contents/MacOS/AceForge" ]; then
+        cp "${BUNDLED_BIN}" "${BUNDLED_APP}/Contents/MacOS/AceForge"
+        chmod +x "${BUNDLED_APP}/Contents/MacOS/AceForge"
+    fi
 fi
 
 # Code sign the app bundle (critical for macOS - must be LAST step)

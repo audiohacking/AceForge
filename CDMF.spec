@@ -212,17 +212,15 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    # Binary renamed to AceForge_bin (not AceForge) because:
-    # - The main "AceForge" executable is the wrapper script (macos_terminal_launcher.sh)
-    # - The wrapper opens Terminal.app and then runs launch_in_terminal.sh
-    # - launch_in_terminal.sh executes this binary (AceForge_bin)
-    # This architecture allows the app to launch in Terminal with visible logs
+    # For serverless pywebview app: binary is AceForge_bin internally,
+    # but will be copied/renamed to AceForge in the app bundle
+    # This is the main entry point (aceforge_app.py) - no Flask, no terminal
     name='AceForge_bin',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,  # Hide console window for native app experience (pywebview handles UI)
+    console=False,  # Hide console window - pywebview provides native UI
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
