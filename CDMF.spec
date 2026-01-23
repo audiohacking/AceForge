@@ -111,7 +111,7 @@ except Exception as e:
     print(f"[CDMF.spec] WARNING: collect_data_files('tokenizers') failed: {e}")
 
 a = Analysis(
-    ['music_forge_ui.py'],
+    ['aceforge_app.py'],
     pathex=[],
     binaries=_lzma_binaries + _tokenizers_binaries + [
         # _lzma and tokenizers binaries are collected above
@@ -140,12 +140,15 @@ a = Analysis(
         'diffusers.pipelines.stable_diffusion_3.pipeline_stable_diffusion_3',
         'diffusers.utils.torch_utils',
         'diffusers.utils.peft_utils',
-        'transformers',
+        # Collect all transformers submodules (critical for frozen apps)
+        *collect_submodules('transformers'),
         'torch',
         'torchaudio',
-        'torchvision',
+        # Collect all torchvision submodules (critical for transformers integration)
+        *collect_submodules('torchvision'),
         'flask',
         'waitress',
+        'webview',  # pywebview for native window UI (imported as 'webview')
         # Required by cdmf_pipeline_ace_step.py
         'loguru',
         'huggingface_hub',
@@ -209,17 +212,15 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    # Binary renamed to AceForge_bin (not AceForge) because:
-    # - The main "AceForge" executable is the wrapper script (macos_terminal_launcher.sh)
-    # - The wrapper opens Terminal.app and then runs launch_in_terminal.sh
-    # - launch_in_terminal.sh executes this binary (AceForge_bin)
-    # This architecture allows the app to launch in Terminal with visible logs
+    # For serverless pywebview app: binary is AceForge_bin internally,
+    # but will be copied/renamed to AceForge in the app bundle
+    # This is the main entry point (aceforge_app.py) - no Flask, no terminal
     name='AceForge_bin',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # Keep console for server logs
+    console=False,  # Hide console window - pywebview provides native UI
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -252,10 +253,14 @@ app = BUNDLE(
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '12.0',
         'NSRequiresAquaSystemAppearance': False,
-        # Show in dock and run in foreground
+        # Show in dock and run in foreground (native app experience)
         'LSUIElement': False,
         'LSBackgroundOnly': False,
         'CFBundlePackageType': 'APPL',
+        # Native macOS app behavior
+        'NSAppTransportSecurity': {
+            'NSAllowsLocalNetworking': True,  # Allow localhost connections for Flask
+        },
         # The main executable will be the wrapper script added by build workflow
         'CFBundleExecutable': 'AceForge',
     },

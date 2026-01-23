@@ -10,6 +10,8 @@ import queue
 import logging
 import time
 import re
+import socket
+import webbrowser
 from io import StringIO
 
 # ---------------------------------------------------------------------------
@@ -166,8 +168,27 @@ from cdmf_training import create_training_blueprint
 from cdmf_generation import create_generation_blueprint
 from cdmf_lyrics import create_lyrics_blueprint
 
-# Flask app
-app = Flask(__name__)
+# Global flag to prevent main() from running when imported
+_MUSIC_FORGE_UI_IMPORTED = False
+
+# Flask app - configure static folder for frozen apps
+if getattr(sys, 'frozen', False):
+    # In frozen app, static files are in Resources/static/
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller bundle
+        static_folder = Path(sys._MEIPASS) / 'static'
+        template_folder = Path(sys._MEIPASS) / 'static'  # Templates are also in static
+    else:
+        # Fallback
+        static_folder = Path(__file__).parent / 'static'
+        template_folder = Path(__file__).parent / 'static'
+    app = Flask(__name__, static_folder=str(static_folder), template_folder=str(template_folder))
+else:
+    # Development mode - use default static folder
+    app = Flask(__name__)
+
+# Mark that this module has been imported (not run directly)
+_MUSIC_FORGE_UI_IMPORTED = True
 
 # ---------------------------------------------------------------------------
 # Log streaming infrastructure
@@ -435,8 +456,32 @@ def shutdown_server():
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    """
+    Legacy main function - only used when music_forge_ui.py is run directly.
+    When imported by aceforge_app.py, this function should NOT be called.
+    """
+    # CRITICAL GUARD: Only execute if this file is run directly (not imported)
+    # This prevents aceforge_app.py or any other importer from triggering window creation
+    if __name__ != "__main__":
+        print(f"[AceForge] BLOCKED: music_forge_ui.main() called but __name__={__name__} (not '__main__')", flush=True)
+        return
+    
+    # Additional safety check: If this module was imported (not run directly), don't execute
+    # The _MUSIC_FORGE_UI_IMPORTED flag is set when the module is imported
+    if _MUSIC_FORGE_UI_IMPORTED and __name__ == "__main__":
+        # This is a weird case - module was imported but then run directly
+        # Still check if aceforge_app is loaded
+        if 'aceforge_app' in sys.modules:
+            print("[AceForge] BLOCKED: music_forge_ui.main() called but aceforge_app is loaded - skipping to prevent duplicate windows", flush=True)
+            return
+    
+    # Additional safety check: If aceforge_app is in sys.modules, we're being imported
+    # by aceforge_app.py and should NOT create windows
+    if 'aceforge_app' in sys.modules:
+        print("[AceForge] BLOCKED: music_forge_ui.main() called but aceforge_app is loaded - skipping to prevent duplicate windows", flush=True)
+        return
+    
     from waitress import serve
-    import webbrowser
 
     # Do not download the ACE-Step model here. Instead, let the UI trigger
     # a background download so the server can start quickly.
@@ -465,38 +510,194 @@ def main() -> None:
         flush=True,
     )
 
+    # CRITICAL: In frozen apps, aceforge_app.py handles ALL window creation
+    # music_forge_ui.py should NEVER create windows when imported by aceforge_app.py
+    # This is a pure Flask server - no pywebview code here
+    aceforge_app_loaded = 'aceforge_app' in sys.modules
+    
+    # If aceforge_app is loaded, we're running in the frozen app
+    # In this case, aceforge_app.py handles all window creation
+    # music_forge_ui.py should ONLY serve Flask, never create windows
+    if aceforge_app_loaded:
+        # Running in frozen app - aceforge_app.py handles windows
+        # Just start Flask server (blocking)
+        print("[AceForge] Running in frozen app mode - aceforge_app handles windows, starting Flask server only...", flush=True)
+        serve(app, host="127.0.0.1", port=5056)
+        return
+    
+    # Only use pywebview if running music_forge_ui.py directly (not imported)
+    # AND not in frozen app (frozen apps use aceforge_app.py)
     is_frozen = getattr(sys, "frozen", False)
+    use_pywebview = is_frozen and not aceforge_app_loaded
 
-    # macOS-focused: Use webbrowser to open loading page or main URL
-    # Use a module-level flag to ensure browser only opens once
-    if is_frozen and not hasattr(main, '_browser_opened'):
+    # Configuration constants for pywebview mode (only used when running directly)
+    SERVER_SHUTDOWN_DELAY = 0.3  # Seconds to wait for graceful shutdown
+    SOCKET_CHECK_TIMEOUT = 0.5   # Socket connection timeout in seconds
+    KEEP_ALIVE_INTERVAL = 1      # Seconds between keep-alive checks
+
+    if use_pywebview:
+        # Use pywebview for native window experience
         try:
-            # Set flag immediately to prevent multiple opens
-            main._browser_opened = True
+            import webview
+            from waitress import create_server
             
-            static_root = Path(app.static_folder or (cdmf_paths.APP_DIR / "static"))
-            loader_path = static_root / "loading.html"
-
-            # Use webbrowser.open_new() to ensure a new window, not a tab
-            if loader_path.exists():
+            # Server control - use a shared reference to the server instance
+            server_instance = None
+            server_shutdown_event = threading.Event()
+            
+            # Start Flask server in a background thread using programmatic approach
+            def start_server():
+                """Start the Flask server in a background thread"""
+                nonlocal server_instance
                 try:
-                    webbrowser.open_new(loader_path.as_uri())
+                    # Create server instance for programmatic control
+                    server_instance = create_server(app, host="127.0.0.1", port=5056)
+                    print("[AceForge] Server starting on http://127.0.0.1:5056", flush=True)
+                    server_instance.run()
+                except Exception as e:
+                    if not server_shutdown_event.is_set():
+                        print(f"[AceForge] Server error: {e}", flush=True)
+            
+            def shutdown_server():
+                """Gracefully shutdown the Flask server"""
+                nonlocal server_instance
+                if server_shutdown_event.is_set():
+                    return  # Already shutting down
+                
+                print("[AceForge] Shutting down server...", flush=True)
+                server_shutdown_event.set()
+                
+                # Use programmatic shutdown instead of signals
+                if server_instance is not None:
+                    try:
+                        server_instance.close()
+                    except Exception:
+                        # Best-effort shutdown; ignore failures during cleanup
+                        pass
+            
+            def on_closed():
+                """Callback when window is closed - shutdown everything"""
+                print("[AceForge] Window closed by user, shutting down...", flush=True)
+                shutdown_server()
+                # Brief pause to allow server.close() to complete gracefully
+                time.sleep(SERVER_SHUTDOWN_DELAY)
+                sys.exit(0)
+            
+            # Start server thread as daemon (will exit when main thread exits)
+            # The server is stopped programmatically via server.close() in on_closed()
+            server_thread = threading.Thread(target=start_server, daemon=True, name="FlaskServer")
+            server_thread.start()
+            
+            # Wait for server to be ready (simple check with socket)
+            max_wait = 5
+            waited = 0
+            server_ready = False
+            while waited < max_wait and not server_ready:
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(SOCKET_CHECK_TIMEOUT)
+                    result = sock.connect_ex(('127.0.0.1', 5056))
+                    sock.close()
+                    if result == 0:
+                        server_ready = True
+                        break
                 except Exception:
-                    webbrowser.open_new("http://127.0.0.1:5056/")
-            else:
-                webbrowser.open_new("http://127.0.0.1:5056/")
-        except Exception as e:
-            print(
-                f"[AceForge] Failed to open browser automatically: {e}",
-                flush=True,
+                    # Socket check failed; continue waiting
+                    pass
+                time.sleep(0.2)
+                waited += 0.2
+            
+            if not server_ready:
+                print("[AceForge] WARNING: Server may not be ready", flush=True)
+            
+            # Create native window with pywebview
+            window_url = "http://127.0.0.1:5056/"
+            
+            print("[AceForge] Opening native window...", flush=True)
+            
+            # Create window with native macOS styling
+            webview.create_window(
+                title="AceForge - AI Music Generation",
+                url=window_url,
+                width=1400,
+                height=900,
+                min_size=(1000, 700),
+                resizable=True,
+                fullscreen=False,
+                # macOS-specific options for native feel
+                on_top=False,
+                shadow=True,
+                # Window close callback - critical for proper shutdown
+                on_closed=on_closed,
             )
+            
+            # Start the GUI event loop (this blocks until window is closed)
+            # When window closes, on_closed() will be called automatically
+            webview.start(debug=False)
+            
+            # This should not be reached (on_closed exits), but just in case
+            shutdown_server()
+            sys.exit(0)
+            
+        except ImportError:
+            # Fallback to browser if pywebview is not available
+            print("[AceForge] pywebview not available, falling back to browser...", flush=True)
             try:
                 webbrowser.open_new("http://127.0.0.1:5056/")
             except Exception:
+                # Browser launch failed; user can manually navigate to URL
                 pass
-
-    # Start Flask (blocking)
-    serve(app, host="127.0.0.1", port=5056)
+            # Start Flask (blocking)
+            serve(app, host="127.0.0.1", port=5056)
+        except Exception as e:
+            # pywebview initialization failed; fall back to browser
+            print(f"[AceForge] Error with pywebview: {e}", flush=True)
+            print("[AceForge] Falling back to browser...", flush=True)
+            # Check if server is already running before starting a new one
+            server_running = False
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(SOCKET_CHECK_TIMEOUT)
+                result = sock.connect_ex(('127.0.0.1', 5056))
+                sock.close()
+                server_running = (result == 0)
+            except Exception:
+                # Socket check failed; assume server not running
+                pass
+            
+            if server_running:
+                # Server already running from failed pywebview attempt; just open browser
+                print("[AceForge] Server already running, opening browser...", flush=True)
+                try:
+                    webbrowser.open_new("http://127.0.0.1:5056/")
+                except Exception:
+                    # Browser launch failed; user can manually navigate to URL
+                    pass
+                # Keep main thread alive (server is in background thread)
+                try:
+                    while True:
+                        time.sleep(KEEP_ALIVE_INTERVAL)
+                except KeyboardInterrupt:
+                    print("[AceForge] Interrupted by user", flush=True)
+                    sys.exit(0)
+            else:
+                # Start fresh server and browser
+                try:
+                    webbrowser.open_new("http://127.0.0.1:5056/")
+                except Exception:
+                    # Browser launch failed; user can manually navigate to URL
+                    pass
+                # Start Flask (blocking)
+                serve(app, host="127.0.0.1", port=5056)
+    else:
+        # Development mode: use browser
+        try:
+            webbrowser.open_new("http://127.0.0.1:5056/")
+        except Exception:
+            # Browser launch failed; user can manually navigate to URL
+            pass
+        # Start Flask (blocking)
+        serve(app, host="127.0.0.1", port=5056)
 
 
 if __name__ == "__main__":
