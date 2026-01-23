@@ -51,6 +51,17 @@ jobs:
     - name: Install ACE-Step (no deps)
       run: |
         pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
+    
+    - name: Cache ACE-Step models
+      uses: actions/cache@v4
+      id: cache-models
+      with:
+        path: |
+          ~/Library/Application Support/AceForge/models/checkpoints
+          ace_models/checkpoints
+        key: ace-step-models-v1-${{ runner.os }}
+        restore-keys: |
+          ace-step-models-v1-${{ runner.os }}
       
     - name: Install PyInstaller
       run: |
@@ -79,12 +90,13 @@ jobs:
       env:
         MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY || '-' }}
         
-    - name: Download ACE-Step models
+    - name: Download ACE-Step models (if not cached)
+      if: steps.cache-models.outputs.cache-hit != 'true'
       run: |
-        echo "Downloading ACE-Step models..."
-        # Use the bundled app's Python to download models (tests the bundled environment)
-        # But first, let's use regular Python to download models for testing
+        echo "Models not in cache, downloading..."
         python ace_model_setup.py
+        echo "Models downloaded successfully"
+      continue-on-error: false
         
     - name: Verify models downloaded
       run: |

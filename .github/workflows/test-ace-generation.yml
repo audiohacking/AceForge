@@ -42,6 +42,25 @@ jobs:
     - name: Install ACE-Step (no deps)
       run: |
         pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
+    
+    - name: Cache ACE-Step models
+      uses: actions/cache@v4
+      id: cache-models
+      with:
+        path: |
+          ~/Library/Application Support/AceForge/models/checkpoints
+          ace_models/checkpoints
+        key: ace-step-models-v1-${{ runner.os }}
+        restore-keys: |
+          ace-step-models-v1-${{ runner.os }}
+      
+    - name: Download ACE-Step models (if not cached)
+      if: steps.cache-models.outputs.cache-hit != 'true'
+      run: |
+        echo "Models not in cache, downloading..."
+        python ace_model_setup.py
+        echo "Models downloaded successfully"
+      continue-on-error: false
       
     - name: Verify ACE-Step import
       run: |
@@ -92,11 +111,6 @@ jobs:
         print(f'✓ ACEStepPipeline class imported successfully')
         print(f'✓ ACEStepPipeline type: {type(ACEStepPipeline)}')
         "
-        
-    - name: Download ACE-Step models
-      run: |
-        echo "Downloading ACE-Step models..."
-        python ace_model_setup.py
         
     - name: Verify models downloaded
       run: |
