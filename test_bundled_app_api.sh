@@ -51,15 +51,14 @@ echo ""
 
 # Check if models exist
 echo "Checking for ACE-Step models..."
-if ! $BUNDLED_BIN -c "from ace_model_setup import get_ace_checkpoint_root, ACE_LOCAL_DIRNAME; from pathlib import Path; root = get_ace_checkpoint_root(); repo = root / ACE_LOCAL_DIRNAME; exit(0 if repo.exists() else 1)" 2>/dev/null; then
-    echo "⚠ Models not found. Please download them first:"
-    echo "  python ace_model_setup.py"
-    echo ""
-    echo "Skipping generation test."
-    exit 0
+MODELS_EXIST=false
+if $BUNDLED_BIN -c "from ace_model_setup import get_ace_checkpoint_root, ACE_LOCAL_DIRNAME; from pathlib import Path; root = get_ace_checkpoint_root(); repo = root / ACE_LOCAL_DIRNAME; exit(0 if repo.exists() else 1)" 2>/dev/null; then
+    MODELS_EXIST=true
+    echo "✓ Models found"
+else
+    echo "⚠ Models not found. Will test server startup only."
+    echo "  To test generation, download models first: python ace_model_setup.py"
 fi
-
-echo "✓ Models found"
 echo ""
 
 # Start the app in background
@@ -86,6 +85,67 @@ for i in {1..30}; do
 done
 
 echo ""
+
+if [ "$MODELS_EXIST" = false ]; then
+    echo "Skipping generation test (models not available)"
+    echo ""
+    echo "✓ Server started successfully"
+    echo "✓ App is responding"
+    echo ""
+    echo "Running critical import and data file checks..."
+    $BUNDLED_BIN -c "
+import sys
+errors = []
+try:
+    import lzma, _lzma
+    print('✓ lzma OK')
+except Exception as e:
+    print(f'✗ lzma: {e}')
+    errors.append(('lzma', str(e)))
+try:
+    import py3langid
+    from pathlib import Path
+    data_file = Path(py3langid.__file__).parent / 'data' / 'model.plzma'
+    if data_file.exists():
+        print(f'✓ py3langid data/model.plzma FOUND')
+    else:
+        print(f'✗ py3langid data/model.plzma NOT FOUND at {data_file}')
+        errors.append(('py3langid data', 'not found'))
+except Exception as e:
+    print(f'✗ py3langid: {e}')
+    errors.append(('py3langid', str(e)))
+try:
+    from acestep.models.lyrics_utils.lyric_tokenizer import VoiceBpeTokenizer
+    print('✓ VoiceBpeTokenizer OK')
+except Exception as e:
+    print(f'✗ VoiceBpeTokenizer: {e}')
+    errors.append(('VoiceBpeTokenizer', str(e)))
+try:
+    from cdmf_pipeline_ace_step import ACEStepPipeline
+    print('✓ ACEStepPipeline OK')
+except Exception as e:
+    print(f'✗ ACEStepPipeline: {e}')
+    errors.append(('ACEStepPipeline', str(e)))
+if errors:
+    print('')
+    print('✗ Some checks failed - see errors above')
+    sys.exit(1)
+else:
+    print('')
+    print('✓ All critical checks passed')
+" || {
+        echo ""
+        echo "✗ Critical checks failed"
+        kill $APP_PID 2>/dev/null || true
+        exit 1
+    }
+    echo ""
+    echo "To test generation, download models first:"
+    echo "  python ace_model_setup.py"
+    kill $APP_PID 2>/dev/null || true
+    wait $APP_PID 2>/dev/null || true
+    exit 0
+fi
 
 # Test generation via API (exactly like the browser does)
 echo "Testing generation via API..."
