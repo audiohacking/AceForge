@@ -18,17 +18,30 @@ os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
 if 'PYTORCH_MPS_HIGH_WATERMARK_RATIO' not in os.environ:
     os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
 
-# Critical: Import lzma EARLY (before any ACE-Step imports)
-try:
-    import lzma
-    import _lzma
-    test_data = b"test"
-    compressed = lzma.compress(test_data)
-    decompressed = lzma.decompress(compressed)
-    if decompressed == test_data and getattr(sys, 'frozen', False):
-        print("[AceForge] lzma module initialized successfully.", flush=True)
-except Exception as e:
-    print(f"[AceForge] WARNING: lzma initialization: {e}", flush=True)
+# CRITICAL: Prevent module-level code from running multiple times
+# This module should only initialize once, even if somehow re-imported
+if not hasattr(sys.modules.get(__name__, None), '_aceforge_app_initialized'):
+    _aceforge_app_initialized = True
+    sys.modules[__name__]._aceforge_app_initialized = True
+    
+    # Critical: Import lzma EARLY (before any ACE-Step imports)
+    try:
+        import lzma
+        import _lzma
+        test_data = b"test"
+        compressed = lzma.compress(test_data)
+        decompressed = lzma.decompress(compressed)
+        if decompressed == test_data and getattr(sys, 'frozen', False):
+            print("[AceForge] lzma module initialized successfully.", flush=True)
+    except Exception as e:
+        print(f"[AceForge] WARNING: lzma initialization: {e}", flush=True)
+else:
+    # Module already initialized - this should NEVER happen in normal execution
+    # If it does, something is seriously wrong with the import system
+    print("[AceForge] CRITICAL: aceforge_app.py module-level code executed multiple times!", flush=True)
+    print("[AceForge] This indicates a serious design flaw - modules should not be re-executed", flush=True)
+    import traceback
+    print(f"[AceForge] Re-execution call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
 
 # CRITICAL: Global state for singleton enforcement (persists across re-imports)
 _webview_start_called = False
@@ -396,9 +409,6 @@ if __name__ == '__main__':
     
     try:
         main()
-    finally:
-        # Remove lock file on exit
-        _lock_file.unlink(missing_ok=True)
     except Exception as e:
         import traceback
         error_msg = (
