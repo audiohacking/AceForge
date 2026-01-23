@@ -1,0 +1,341 @@
+name: Test Bundled App Generation
+
+on:
+  pull_request:
+    paths:
+      - 'CDMF.spec'
+      - 'cdmf_pipeline_ace_step.py'
+      - 'generate_ace.py'
+      - 'music_forge_ui.py'
+      - '.github/workflows/test-bundled-app.yml'
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-bundled-app-generation:
+    name: Build App Bundle and Test Generation
+    runs-on: macos-latest
+    timeout-minutes: 90
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Display Python version
+      run: python --version
+      
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements_ace_macos.txt
+        pip install rotary_embedding_torch
+        
+    - name: Install audio-separator (no deps)
+      run: |
+        pip install "audio-separator==0.40.0" --no-deps
+        
+    - name: Install py3langid (no deps)
+      run: |
+        pip install "py3langid==0.3.0" --no-deps
+        
+    - name: Install ACE-Step (no deps)
+      run: |
+        pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
+      
+    - name: Install PyInstaller
+      run: |
+        pip install pyinstaller==6.17.0
+        
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller CDMF.spec
+        echo "Build completed. Checking app bundle structure..."
+        ls -la dist/AceForge.app/Contents/MacOS/ || echo "MacOS directory not found"
+        
+    - name: Add terminal launcher script to app bundle
+      run: |
+        # Copy the launcher script into the MacOS directory of the app bundle
+        cp launch_in_terminal.sh dist/AceForge.app/Contents/MacOS/
+        chmod +x dist/AceForge.app/Contents/MacOS/launch_in_terminal.sh
+        
+        # Copy and set up the terminal launcher wrapper as the main "AceForge" executable
+        cp macos_terminal_launcher.sh dist/AceForge.app/Contents/MacOS/AceForge
+        chmod +x dist/AceForge.app/Contents/MacOS/AceForge
+        
+    - name: Code sign the app bundle
+      run: |
+        chmod +x build/macos/codesign.sh
+        ./build/macos/codesign.sh dist/AceForge.app
+      env:
+        MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY || '-' }}
+        
+    - name: Download ACE-Step models
+      run: |
+        echo "Downloading ACE-Step models..."
+        # Use the bundled app's Python to download models (tests the bundled environment)
+        # But first, let's use regular Python to download models for testing
+        python ace_model_setup.py
+        
+    - name: Verify models downloaded
+      run: |
+        python -c "
+        from pathlib import Path
+        import sys
+        from ace_model_setup import ACE_LOCAL_DIRNAME, get_ace_checkpoint_root
+        
+        checkpoint_root = get_ace_checkpoint_root()
+        print(f'Checking for models in: {checkpoint_root}')
+        
+        if not checkpoint_root.exists():
+            print(f'✗ Models directory does not exist at {checkpoint_root}')
+            sys.exit(1)
+        
+        print(f'✓ Models directory exists at {checkpoint_root}')
+            
+        ace_repo_dir = checkpoint_root / ACE_LOCAL_DIRNAME
+        if not ace_repo_dir.exists():
+            print(f'✗ ACE-Step model directory not found at {ace_repo_dir}')
+            sys.exit(1)
+        
+        print(f'✓ Found ACE-Step model directory: {ace_repo_dir}')
+        
+        required_dirs = ['music_dcae_f8c8', 'music_vocoder', 'ace_step_transformer', 'umt5-base']
+        all_exist = True
+        for dir_name in required_dirs:
+            dir_path = ace_repo_dir / dir_name
+            if dir_path.exists():
+                print(f'✓ {dir_name} directory exists')
+            else:
+                print(f'✗ {dir_name} directory missing in {ace_repo_dir}')
+                all_exist = False
+        
+        if not all_exist:
+            print('✗ Not all required model directories exist')
+            sys.exit(1)
+        
+        print('✓ All required model directories exist')
+        "
+        
+    - name: Set Environment Variables for Lower Memory Usage
+      run: |
+        echo "PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0" >> $GITHUB_ENV
+        echo "Set PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0"
+        
+    - name: Test generation using bundled app binary
+      run: |
+        echo "Testing generation using the bundled app binary..."
+        echo "This tests the actual frozen app bundle, catching all PyInstaller bundling issues."
+        
+        # Get the path to the bundled binary
+        BUNDLED_BIN="./dist/AceForge.app/Contents/MacOS/AceForge_bin"
+        
+        if [ ! -f "$BUNDLED_BIN" ]; then
+          echo "✗ Bundled binary not found at $BUNDLED_BIN"
+          exit 1
+        fi
+        
+        echo "✓ Found bundled binary at $BUNDLED_BIN"
+        
+        # Test if the bundled app can import the required modules
+        echo ""
+        echo "Step 1: Testing bundled app imports..."
+        "$BUNDLED_BIN" -c "
+        import sys
+        print('Python version:', sys.version)
+        print('Frozen:', getattr(sys, 'frozen', False))
+        print('Executable:', sys.executable)
+        
+        # Test critical imports that have been problematic
+        errors = []
+        
+        try:
+            import lzma
+            import _lzma
+            print('✓ lzma imported successfully')
+        except Exception as e:
+            print(f'✗ lzma import failed: {e}')
+            errors.append(('lzma', str(e)))
+        
+        try:
+            from acestep.models.lyrics_utils.lyric_tokenizer import VoiceBpeTokenizer
+            print('✓ VoiceBpeTokenizer imported successfully')
+        except Exception as e:
+            print(f'✗ VoiceBpeTokenizer import failed: {e}')
+            errors.append(('VoiceBpeTokenizer', str(e)))
+        
+        try:
+            from cdmf_pipeline_ace_step import ACEStepPipeline
+            print('✓ ACEStepPipeline imported successfully')
+        except Exception as e:
+            print(f'✗ ACEStepPipeline import failed: {e}')
+            errors.append(('ACEStepPipeline', str(e)))
+        
+        if errors:
+            print('')
+            print('✗ Import errors detected:')
+            for module, error in errors:
+                print(f'  - {module}: {error}')
+            sys.exit(1)
+        
+        print('✓ All critical imports successful')
+        " || {
+          echo ""
+          echo "✗ Bundled app import test failed"
+          echo "This indicates missing modules or dependencies in the PyInstaller bundle."
+          exit 1
+        }
+        
+        echo ""
+        echo "Step 2: Testing actual generation with bundled app..."
+        echo "This will catch runtime bundling issues (missing binaries, data files, etc.)"
+        
+        # Create a test script that imports and uses generate_ace
+        cat > test_bundled_generation.py << 'TESTSCRIPT'
+import sys
+import os
+from pathlib import Path
+
+# Set environment to match CI
+os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+
+print("=" * 60)
+print("Bundled App Generation Test")
+print("=" * 60)
+print(f"Python executable: {sys.executable}")
+print(f"Frozen: {getattr(sys, 'frozen', False)}")
+print(f"Python version: {sys.version}")
+print("=" * 60)
+
+# Import from the bundled app's modules
+try:
+    from generate_ace import generate_track_ace
+    print("✓ generate_track_ace imported successfully")
+except Exception as e:
+    print(f"✗ Failed to import generate_track_ace: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+# Run a minimal generation test
+print("")
+print("Starting generation test (10 seconds, 5 steps)...")
+try:
+    result = generate_track_ace(
+        genre_prompt="upbeat electronic music, synthwave",
+        instrumental=True,
+        target_seconds=10,
+        steps=5,
+        guidance_scale=4.0,
+        seed=42,
+        out_dir=Path("test_output_bundled"),
+        basename="ci_test_bundled_track"
+    )
+    
+    print("")
+    print("✓ Generation completed successfully")
+    print(f"Result keys: {list(result.keys()) if isinstance(result, dict) else 'N/A'}")
+    
+    # Check if output file was created
+    output_dir = Path("test_output_bundled")
+    if not output_dir.exists():
+        print(f"✗ Output directory does not exist: {output_dir}")
+        sys.exit(1)
+    
+    wav_files = list(output_dir.glob("*.wav"))
+    if not wav_files:
+        print(f"✗ No WAV files found in {output_dir}")
+        sys.exit(1)
+    
+    MIN_SIZE = 100_000  # Minimum expected size for 10-second audio
+    for wav_file in wav_files:
+        size = wav_file.stat().st_size
+        print(f"✓ Generated file: {wav_file.name} ({size:,} bytes)")
+        if size == 0:
+            print(f"✗ File is empty: {wav_file.name}")
+            sys.exit(1)
+        if size < MIN_SIZE:
+            print(f"⚠ File seems small for 10 seconds: {wav_file.name} ({size:,} bytes)")
+    
+    print("")
+    print("=" * 60)
+    print("✓ Bundled app generation test PASSED")
+    print("=" * 60)
+        
+except Exception as e:
+    print("")
+    print("=" * 60)
+    print("✗ Generation failed")
+    print("=" * 60)
+    print(f"Error: {e}")
+    print("")
+    print("Full traceback:")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+TESTSCRIPT
+
+        # Run the test using the bundled binary
+        "$BUNDLED_BIN" test_bundled_generation.py || {
+          echo ""
+          echo "=" 
+          echo "✗ Bundled app generation test FAILED"
+          echo "=" 
+          echo "This indicates a PyInstaller bundling issue that needs to be fixed."
+          echo "Check the error messages above to identify missing dependencies."
+          exit 1
+        }
+        
+    - name: Verify bundled app output
+      run: |
+        python -c "
+        from pathlib import Path
+        
+        output_dir = Path('test_output_bundled')
+        if not output_dir.exists():
+            print('✗ Output directory does not exist')
+            exit(1)
+        
+        wav_files = list(output_dir.glob('*.wav'))
+        if not wav_files:
+            print('✗ No WAV files found in output directory')
+            exit(1)
+        
+        MIN_10SEC_AUDIO_SIZE_BYTES = 100_000
+        for wav_file in wav_files:
+            size = wav_file.stat().st_size
+            print(f'✓ Generated file: {wav_file.name} ({size:,} bytes)')
+            if size < MIN_10SEC_AUDIO_SIZE_BYTES:
+                print(f'✗ File seems too small for 10 seconds of audio')
+                exit(1)
+        
+        print('✓ Bundled app generation test successful')
+        "
+        
+    - name: Upload test output as artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: bundled-app-test-output
+        path: test_output_bundled/
+        retention-days: 7
+        
+    - name: Upload build warnings/errors
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: pyinstaller-build-logs
+        path: |
+          build/*/warn-*.txt
+          build/*/xref-*.html
+        retention-days: 7
+        if-no-files-found: ignore
