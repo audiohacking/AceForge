@@ -1673,6 +1673,13 @@ HTML = r"""
                     <div class="track-actions">
                       <button type="button"
                               class="track-delete-btn"
+                              data-role="copy-settings"
+                              title="Copy generation settings back into the form"
+                              aria-label="Reuse prompt">
+                        ⧉
+                      </button>
+                      <button type="button"
+                              class="track-delete-btn"
                               data-role="delete"
                               aria-label="Delete">
                         🗑

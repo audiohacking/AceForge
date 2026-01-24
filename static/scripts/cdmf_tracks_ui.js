@@ -477,6 +477,22 @@
 
       refreshTracksAfterGeneration({ autoplay: false });
     });
+
+    // Delegated click for copy-settings (reuse prompt) on template-rendered rows
+    // and any row where the direct handler might not be attached
+    const panel = document.getElementById("trackListPanel");
+    if (panel) {
+      panel.addEventListener("click", function (ev) {
+        const btn = ev.target?.closest?.("[data-role=\"copy-settings\"]");
+        if (!btn) return;
+        const row = btn.closest(".track-row");
+        if (!row) return;
+        const name = row.dataset.trackName || row.getAttribute("data-track-name");
+        if (!name) return;
+        ev.stopPropagation();
+        copySettingsFromTrack(name);
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------

@@ -400,7 +400,7 @@ p {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex: 0 0 40px;
+  flex: 0 0 100px;
   justify-content: flex-end;
 }
 .track-fav-btn,
