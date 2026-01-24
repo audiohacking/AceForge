@@ -2,8 +2,7 @@
 
 # AceForge
 
-AceForge is a **local-first AI music workstation for macOS** powered by **[ACE-Step](https://github.com/ace-step/ACE-Step)**<br>
-It runs on your Mac, uses Apple Silicon GPU acceleration and keeps your prompts and audio local. 
+AceForge is a **local-first AI music workstation for macOS Silicon** powered by **[ACE-Step](https://github.com/ace-step/ACE-Step)**<br>
 
 > Status: **ALPHA**
 
