@@ -6,6 +6,9 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 
 > Status: **ALPHA**
 
+<img width="779" height="588" alt="image" src="https://github.com/user-attachments/assets/bd520fcb-7c79-450e-8613-6e30a252a8ca" />
+
+
 ## Features
 
 - 100% Local _(only needs to download models once)_
