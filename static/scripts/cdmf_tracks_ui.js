@@ -19,8 +19,8 @@
         candyModelStatusTimer: null,
         candyGenerateButtonDefaultHTML: null,
         candyTrainButtonDefaultHTML: null,
-        candyTrackSortKey: null,
-        candyTrackSortDir: "asc",
+        candyTrackSortKey: "created",
+        candyTrackSortDir: "desc",
         candyTrackFilterCategories: new Set(),
         progressTimer: null,
         candyIsGenerating: false,
@@ -73,7 +73,7 @@
     if (!matched) {
       const opt = document.createElement("option");
       opt.value = url;
-      opt.textContent = trackName;
+      opt.textContent = (trackName || "").replace(/\.(wav|mp3)$/i, "");
       list.appendChild(opt);
       list.value = url;
     } else {
@@ -290,6 +290,32 @@
     }
   }
 
+  async function revealInFinder(trackName) {
+    try {
+      const resp = await fetch("/tracks/reveal-in-finder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trackName }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data || !data.ok) {
+        const msg = (data && data.error) || "Reveal in Finder failed";
+        if (window.CDMF && CDMF.showToast) {
+          CDMF.showToast(msg, "error");
+        } else {
+          window.alert(msg);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to reveal in Finder:", err);
+      if (window.CDMF && CDMF.showToast) {
+        CDMF.showToast("Reveal in Finder failed", "error");
+      } else {
+        window.alert("Reveal in Finder failed");
+      }
+    }
+  }
+
   async function copyRecipeFromTrack(trackName) {
     try {
       const resp = await fetch(
@@ -468,7 +494,7 @@
     if (!rawTracks.length) {
       const empty = document.createElement("div");
       empty.className = "small";
-      empty.textContent = "(No .wav files found yet)";
+      empty.textContent = "(No tracks yet)";
       panel.appendChild(empty);
 
       // Also clear filters if nothing exists
@@ -633,7 +659,7 @@
 
       const title = document.createElement("div");
       title.className = "track-name";
-      const displayName = name.replace(/\.wav$/i, "");
+      const displayName = name.replace(/\.(wav|mp3)$/i, "");
       title.textContent = displayName;
 
       nameCell.appendChild(renameBtn);
@@ -707,12 +733,20 @@
       copyBtn.title = "Copy generation settings back into the form";
       copyBtn.textContent = "⧉";
 
-      const copyRecipeBtn = document.createElement("button");
-      copyRecipeBtn.type = "button";
-      copyRecipeBtn.className = "track-delete-btn";
-      copyRecipeBtn.setAttribute("data-role", "copy-recipe");
-      copyRecipeBtn.title = "Copy full recipe as JSON to clipboard";
-      copyRecipeBtn.textContent = "{}";
+      const downloadLink = document.createElement("a");
+      downloadLink.href = "/music/" + encodeURIComponent(name);
+      downloadLink.setAttribute("download", name);
+      downloadLink.className = "track-delete-btn";
+      downloadLink.setAttribute("data-role", "download");
+      downloadLink.title = "Download";
+      downloadLink.textContent = "↓";
+
+      const revealBtn = document.createElement("button");
+      revealBtn.type = "button";
+      revealBtn.className = "track-delete-btn";
+      revealBtn.setAttribute("data-role", "reveal");
+      revealBtn.title = "Show in Finder";
+      revealBtn.textContent = "📂";
 
       const deleteBtn = document.createElement("button");
       deleteBtn.type = "button";
@@ -721,7 +755,8 @@
       deleteBtn.textContent = "🗑";
 
       actions.appendChild(copyBtn);
-      actions.appendChild(copyRecipeBtn);
+      actions.appendChild(downloadLink);
+      actions.appendChild(revealBtn);
       actions.appendChild(deleteBtn);
 
       // Assemble row ------------------------------------------------------
@@ -732,16 +767,17 @@
       row.appendChild(createdCell);
       row.appendChild(actions);
 
-      // Row click → select & play
+      // Row click → select & play (ignore clicks on action buttons/links)
       row.addEventListener("click", function (ev) {
-        const role =
-          ev.target && ev.target.getAttribute("data-role");
+        const roleEl = ev.target && ev.target.closest && ev.target.closest("[data-role]");
+        const role = roleEl ? roleEl.getAttribute("data-role") : null;
         if (
           role === "favorite" ||
           role === "delete" ||
           role === "category-label" ||
           role === "copy-settings" ||
-          role === "copy-recipe" ||
+          role === "download" ||
+          role === "reveal" ||
           role === "rename"
         ) {
           return;
@@ -765,9 +801,9 @@
         copySettingsFromTrack(name);
       });
 
-      copyRecipeBtn.addEventListener("click", function (ev) {
+      revealBtn.addEventListener("click", function (ev) {
         ev.stopPropagation();
-        copyRecipeFromTrack(name);
+        revealInFinder(name);
       });
 
       renameBtn.addEventListener("click", function (ev) {
@@ -848,7 +884,7 @@
 
           const opt = document.createElement("option");
           opt.value = url;
-          opt.textContent = trackName;
+          opt.textContent = (trackName || "").replace(/\.(wav|mp3)$/i, "");
 
           if (currentName && trackName === currentName) {
             opt.selected = true;

@@ -1666,7 +1666,7 @@ HTML = r"""
                     </button>
                     <div class="track-main">
                       <div class="track-name">
-                        {{ name[:-4] if name.lower().endswith('.wav') else name }}
+                        {{ name[:-4] if (name.lower().endswith('.wav') or name.lower().endswith('.mp3')) else name }}
                       </div>
                       <div class="track-meta">
                         <span class="track-length" data-role="length-label"></span>
@@ -1684,7 +1684,7 @@ HTML = r"""
                   </div>
                   {% endfor %}
                 {% else %}
-                  <div class="small">(No .wav files found yet)</div>
+                  <div class="small">(No tracks yet)</div>
                 {% endif %}
               </div>
 
@@ -1699,11 +1699,11 @@ HTML = r"""
                   {% for name in tracks %}
                     <option value="{{ url_for('cdmf_tracks.serve_music', filename=name) }}"
                             {% if current_track == name %}selected{% endif %}>
-                      {{ name[:-4] if name.lower().endswith('.wav') else name }}
+                      {{ name[:-4] if (name.lower().endswith('.wav') or name.lower().endswith('.mp3')) else name }}
                     </option>
                   {% endfor %}
                 {% else %}
-                  <option value="">(No .wav files found yet)</option>
+                  <option value="">(No tracks yet)</option>
                 {% endif %}
               </select>
             </div>

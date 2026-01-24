@@ -309,7 +309,7 @@ p {
 }
 
 .track-list-panel {
-  max-height: 200px;
+  max-height: 50vh;
   border-radius: 0 0 8px 8px;
   border: 1px solid #1f2937;
   border-top: none;
@@ -412,6 +412,7 @@ p {
   padding: 2px 4px;
   border-radius: 4px;
   font-size: 0.75rem;
+  text-decoration: none;
 }
 .track-fav-btn.favorited {
   color: #facc15;

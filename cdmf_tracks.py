@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
-import time
 import os
+import platform
+import subprocess
+import time
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -100,6 +102,17 @@ def save_user_presets(data: Dict[str, Any]) -> None:
             json.dump(data, f, indent=2, sort_keys=True)
     except Exception as e:
         print(f"[AceForge] Failed to save user_presets.json: {e}", flush=True)
+
+
+def get_audio_duration(path: Path) -> float:
+    """Return duration in seconds. Uses pydub for .wav and .mp3. Returns 0.0 on error."""
+    try:
+        from pydub import AudioSegment
+
+        seg = AudioSegment.from_file(str(path))
+        return len(seg) / 1000.0
+    except Exception:
+        return 0.0
 
 
 def list_music_files() -> List[str]:
@@ -243,17 +256,23 @@ def create_tracks_blueprint() -> Blueprint:
         track_items = []
         for name in tracks:
             info = meta.get(name, {})
+            seconds_val = float(info.get("seconds") or 0.0)
+            if seconds_val <= 0:
+                seconds_val = get_audio_duration(music_dir / name)
             track_items.append(
                 {
                     "name": name,
                     "favorite": bool(info.get("favorite", False)),
                     "category": info.get("category") or "",
-                    "seconds": float(info.get("seconds") or 0.0),
+                    "seconds": seconds_val,
                     "bpm": float(info.get("bpm")) if info.get("bpm") is not None else None,
                     # Created timestamp: stored in meta if present, otherwise file mtime
                     "created": float(info.get("created") or mtimes.get(name) or 0.0),
                 }
             )
+
+        # Newest first (by created time)
+        track_items.sort(key=lambda x: float(x.get("created") or 0), reverse=True)
 
         return jsonify({"tracks": track_items, "current": current})
 
@@ -450,5 +469,40 @@ def create_tracks_blueprint() -> Blueprint:
                 cdmf_state.LAST_GENERATED_TRACK = None
 
         return jsonify({"ok": True})
+
+    @bp.route("/tracks/reveal-in-finder", methods=["POST"])
+    def reveal_in_finder():
+        """
+        Open the track's parent folder in the system file manager and reveal/select the file.
+        Supported on macOS (open -R). Other platforms may return an error.
+        """
+        payload = request.get_json(silent=True) or {}
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return jsonify({"ok": False, "error": "Missing track name"}), 400
+
+        if "/" in name or "\\" in name or ".." in name:
+            return jsonify({"ok": False, "error": "Invalid track name"}), 400
+
+        track_path = Path(DEFAULT_OUT_DIR) / name
+        if not track_path.is_file():
+            return jsonify({"ok": False, "error": "Track not found"}), 404
+
+        if platform.system() == "Darwin":
+            try:
+                subprocess.run(
+                    ["open", "-R", str(track_path.resolve())],
+                    check=True,
+                    capture_output=True,
+                    timeout=5,
+                )
+                return jsonify({"ok": True})
+            except subprocess.CalledProcessError as e:
+                err = (e.stderr.decode(errors="replace") if e.stderr else str(e)) or "open failed"
+                return jsonify({"ok": False, "error": err}), 500
+            except Exception as e:
+                return jsonify({"ok": False, "error": str(e)}), 500
+        # Windows: explorer /select,"path" ; Linux: xdg-open parent. For now only macOS.
+        return jsonify({"ok": False, "error": "Reveal in Finder is only supported on macOS"}), 501
 
     return bp
