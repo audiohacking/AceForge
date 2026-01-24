@@ -145,13 +145,6 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
   - Reduce max clip seconds during training
   - Lower batch/grad accumulation if you changed them
 
-## Performance Tips for Apple Silicon
-
-- **Unified memory management**: Apple Silicon Macs with unified memory can efficiently share memory between CPU and GPU
-- **Batch sizes**: Start with smaller batch sizes and gradually increase to find optimal performance
-- **Model precision**: The pipeline automatically selects appropriate precision for MPS (float32 instead of bfloat16)
-- **Generation length**: Longer generation times may require more memory; start with shorter durations and scale up
-
 ## Building Releases
 
 Pre-built macOS application bundles are automatically created via GitHub Actions. To build locally use the provided scripts.
