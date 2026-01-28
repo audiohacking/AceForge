@@ -18,6 +18,7 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
   - Train **ACE-Step LoRAs** from your own datasets
     - Mass-create `_prompt.txt` / `_lyrics.txt` files
     - Auto-tag datasets using **MuFun-ACEStep** _(experimental)_
+- Stem Splitting using **Demucs** for high-quality audio separation
 - Voice Cloning TTS using **XTTS v2**
 - Embedded **Music Player** to explore generation catalog
 - Manage and reuse **prompt presets**
@@ -67,8 +68,9 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 2. Go to **Generate** → create tracks from prompt (and lyrics if desired)
 3. Browse/manage tracks in **Music Player**
 4. (Optional) Use stem controls to adjust vocal/instrumental balance
-5. (Optional) **Voice Clone**: TTS voice cloning using reference clips
-6. (Optional) Build a dataset and train a LoRA in **Training**
+5. (Optional) **Stem Splitting**: Separate any audio file into individual stems
+6. (Optional) **Voice Clone**: TTS voice cloning using reference clips
+7. (Optional) Build a dataset and train a LoRA in **Training**
 
 
 
@@ -91,6 +93,19 @@ AceForge can run `audio-separator` as a post-process step so you can rebalance:
 For fast iteration: generate with both gains at `0 dB`, then only use stems once you like a track.
 
 > First use requires downloading a **large** stem model and adds a heavy processing step 
+
+## Stem Splitting (Demucs)
+
+The **Stem Splitting** tab uses **Demucs** for high-quality audio separation of any audio file.
+
+**Features:**
+- **2-stem mode**: Separate vocals and instrumentals
+- **4-stem mode**: Separate vocals, drums, bass, and other instruments
+- **6-stem mode**: Even finer separation including piano and guitar
+
+Upload any audio file (MP3, WAV, etc.) and AceForge will split it into individual stem tracks that appear in the Music Player.
+
+> First use requires downloading the Demucs model (~80MB). Processing time varies based on file length and your device (Apple Silicon MPS is faster than CPU)
 
 ## Voice cloning (XTTS v2)
 

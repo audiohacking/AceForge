@@ -664,6 +664,11 @@ p {
   border: 1px solid #1f2937;
   white-space: pre-wrap;
   word-wrap: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  cursor: text;
 }
 
 .console-output::-webkit-scrollbar {
