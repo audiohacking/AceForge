@@ -323,6 +323,11 @@ a = Analysis(
     excludes=[
         # Note: matplotlib is used by some dependencies but excluded to reduce bundle size
         # If you encounter import errors, remove this exclusion
+        # Slimming: exclude Japanese Sudachi packages (large dictionary payload; not needed)
+        'sudachipy',
+        'sudachidict_core',
+        'sudachidict_small',
+        'sudachidict_full',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
