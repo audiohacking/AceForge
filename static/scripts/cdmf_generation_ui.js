@@ -419,6 +419,14 @@
   function onSubmitForm(ev) {
     const state = getState();
 
+    // Prevent duplicate submissions (double-click protection)
+    if (state.candyIsGenerating || window.candyIsGenerating) {
+      if (ev && ev.preventDefault) {
+        ev.preventDefault();
+      }
+      return false;
+    }
+
     // If the ACE model is not ready yet, repurpose this submit as
     // a "Download Models" action instead of sending /generate.
     if (!state.candyModelsReady) {

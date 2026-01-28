@@ -71,6 +71,14 @@ echo "[Build] Installing additional dependencies..."
 "$PY" -m pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps --quiet
 "$PY" -m pip install "rotary_embedding_torch" --quiet
 
+# ---------------------------------------------------------------------------
+# Slimming: remove Japanese (Sudachi) dictionary payload
+# SudachiDict-core is ~200MB and not needed for AceForge.
+# We explicitly uninstall it (and SudachiPy) so PyInstaller cannot bundle it.
+# ---------------------------------------------------------------------------
+echo "[Build] Removing Japanese Sudachi packages (if present)..."
+"$PY" -m pip uninstall -y SudachiDict-core SudachiPy sudachidict-core sudachipy >/dev/null 2>&1 || true
+
 # Install TTS for voice cloning (required for frozen app; build fails if TTS cannot be imported)
 # TTS 0.21.2 needs its full dependency tree (phonemizers etc.); --no-deps breaks "from TTS.api import TTS"
 echo "[Build] Installing TTS for voice cloning..."
@@ -119,6 +127,10 @@ fi
 
 echo "[Build] PyInstaller version: $("$PY" -m PyInstaller --version)"
 echo ""
+
+# One last pass right before bundling, in case anything reintroduced Sudachi.
+echo "[Build] Final check: removing Japanese Sudachi packages (if present)..."
+"$PY" -m pip uninstall -y SudachiDict-core SudachiPy sudachidict-core sudachipy >/dev/null 2>&1 || true
 
 # Clean previous builds (PyInstaller outputs only).
 # NEVER delete build/macos/ — it contains AceForge.icns (app icon), codesign.sh, pyinstaller hooks.
