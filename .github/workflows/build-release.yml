@@ -144,17 +144,17 @@ jobs:
         name: AceForge-macOS-DMG
         path: AceForge-macOS.dmg
         
-    - name: Upload ZIP artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: AceForge-macOS-ZIP
-        path: AceForge-macOS.zip
+#    - name: Upload ZIP artifact
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: AceForge-macOS-ZIP
+#        path: AceForge-macOS.zip
         
-    - name: Upload checksums
-      uses: actions/upload-artifact@v4
-      with:
-        name: checksums
-        path: checksums.txt
+#    - name: Upload checksums
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: checksums
+#        path: checksums.txt
         
     - name: Upload to Release (if triggered by release)
       if: github.event_name == 'release'
@@ -162,5 +162,5 @@ jobs:
       with:
         files: |
           AceForge-macOS.dmg
-          AceForge-macOS.zip
+#          AceForge-macOS.zip
           checksums.txt
