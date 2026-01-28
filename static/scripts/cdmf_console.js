@@ -68,6 +68,79 @@
     }
   }
 
+  // Copy console content to clipboard
+  function copyConsoleToClipboard() {
+    const consoleOutput = document.getElementById('consoleOutput');
+    if (!consoleOutput) return;
+    
+    // Get all text content from console
+    const text = consoleOutput.textContent || consoleOutput.innerText || '';
+    
+    if (!text.trim()) {
+      alert('Console is empty');
+      return;
+    }
+    
+    // Use modern Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        // Show temporary feedback
+        const copyBtn = document.getElementById('consoleCopyBtn');
+        if (copyBtn) {
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = '✓ Copied!';
+          copyBtn.style.color = '#10b981';
+          setTimeout(() => {
+            copyBtn.textContent = originalText;
+            copyBtn.style.color = '';
+          }, 2000);
+        }
+      }).catch(err => {
+        console.error('[Console] Failed to copy:', err);
+        // Fallback to old method
+        fallbackCopyToClipboard(text);
+      });
+    } else {
+      // Fallback for older browsers
+      fallbackCopyToClipboard(text);
+    }
+  }
+  
+  // Fallback copy method for older browsers
+  function fallbackCopyToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        const copyBtn = document.getElementById('consoleCopyBtn');
+        if (copyBtn) {
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = '✓ Copied!';
+          copyBtn.style.color = '#10b981';
+          setTimeout(() => {
+            copyBtn.textContent = originalText;
+            copyBtn.style.color = '';
+          }, 2000);
+        }
+      } else {
+        alert('Failed to copy. Please select and copy manually.');
+      }
+    } catch (err) {
+      console.error('[Console] Fallback copy failed:', err);
+      alert('Failed to copy. Please select and copy manually.');
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  }
+
   // Append a line to the console output
   function appendLogLine(line) {
     const consoleOutput = document.getElementById('consoleOutput');
@@ -192,6 +265,7 @@
   window.CDMF = window.CDMF || {};
   window.CDMF.toggleConsole = toggleConsole;
   window.CDMF.initConsole = initConsole;
+  window.CDMF.copyConsole = copyConsoleToClipboard;
 
   // Settings panel functions
   let settingsExpanded = false;

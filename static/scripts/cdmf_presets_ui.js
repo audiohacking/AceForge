@@ -184,6 +184,14 @@
       }
     }
 
+    // Stem Split tracks: switch to Stem Splitting tab and fill that form
+    if (settings.generator === "stem_split") {
+      if (typeof CDMF.applyStemSplitSettingsToForm === "function") {
+        CDMF.applyStemSplitSettingsToForm(settings);
+        return;
+      }
+    }
+
     const promptField = document.getElementById("prompt");
     const lyricsField = document.getElementById("lyrics");
     const instrumentalCheckbox = document.getElementById("instrumental");

@@ -62,6 +62,13 @@ HTML = r"""
             onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('voice_clone');">
             Voice Cloning
           </button>
+          <button
+            type="button"
+            class="tab-btn mode-tab-btn"
+            data-mode="stem_split"
+            onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('stem_split');">
+            Stem Splitting
+          </button>
         </div>
 
         <!-- Generation form card (mode: generate) ----------------------------- -->
@@ -895,6 +902,106 @@ HTML = r"""
 
           <!-- Hidden field for output directory (synced from Settings) -->
           <input id="voice_clone_out_dir" name="out_dir" type="hidden" value="{{ default_out_dir or '' }}">
+
+        </form>
+
+        <!-- Stem Splitting form card (mode: stem_split) ----------------------------- -->
+        <form
+          id="stemSplitForm"
+          class="card card-mode"
+          data-mode="stem_split"
+          method="post"
+          action="{{ url_for('cdmf_stem_splitting.stem_split') }}"
+          enctype="multipart/form-data"
+          onsubmit="return CDMF.onSubmitStemSplit(event)"
+          style="display:none;">
+          <div class="card-header-row">
+            <div style="flex:1;min-width:0;">
+              <h2>Stem Splitting</h2>
+              <div id="stemSplitLoadingBar" class="loading-bar" style="display:none;">
+                <div class="loading-bar-inner"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button id="stemSplitButton" type="submit" class="btn primary">
+                <span class="icon">🎚️</span><span>Split Stems</span>
+              </button>
+              <button id="stemSplitDownloadModelsBtn" type="button" class="btn secondary" style="display:none;">
+                <span class="icon">⬇</span><span>Download Demucs models</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="small" style="margin-top:8px;margin-bottom:16px;">
+            Split audio into separate stems (vocals, drums, bass, etc.) using AI models. Upload an audio file and choose the number of stems to extract.
+          </div>
+
+          <div id="stemSplitModelStatusNotice" class="toast" style="margin-top:8px;margin-bottom:16px;display:none;">
+            Demucs model is not downloaded yet. Click "Download Demucs models" below to download it (first use only). This is a one-time download; progress is shown in the loading bar.
+          </div>
+
+          <div class="row">
+            <label for="stem_split_input_file">Input Audio File</label>
+            <input
+              id="stem_split_input_file"
+              name="input_file"
+              type="file"
+              accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg"
+              required>
+            <div class="small">
+              Upload an audio file (MP3, WAV, M4A, FLAC, or OGG) to split into stems.
+            </div>
+          </div>
+
+          <div class="row">
+            <label for="stem_split_stem_count">Number of Stems</label>
+            <select id="stem_split_stem_count" name="stem_count">
+              <option value="2">2-Stem (Vocals / Instrumental)</option>
+              <option value="4" selected>4-Stem (Vocals, Drums, Bass, Other)</option>
+              <option value="6">6-Stem (Vocals, Drums, Bass, Guitar, Piano, Other)</option>
+            </select>
+            <div class="small">
+              Choose how many stems to extract. 2-stem splits vocals and instrumental. 4-stem and 6-stem provide more granular separation.
+            </div>
+          </div>
+
+          <div class="row">
+            <label for="stem_split_mode">Mode (2-Stem Only)</label>
+            <select id="stem_split_mode" name="mode">
+              <option value="" selected>Standard (All Stems)</option>
+              <option value="vocals_only">Acapella (Vocals Only)</option>
+              <option value="instrumental">Instrumental / Karaoke</option>
+            </select>
+            <div class="small">
+              For 2-stem mode: Extract only vocals (acapella) or only instrumental (karaoke). For 4-stem and 6-stem modes, all stems are extracted.
+            </div>
+          </div>
+
+          <div class="row">
+            <label for="stem_split_device">Device</label>
+            <select id="stem_split_device" name="device_preference">
+              <option value="auto" selected>Auto (MPS if available, else CPU)</option>
+              <option value="mps">Apple Silicon GPU (MPS)</option>
+              <option value="cpu">CPU</option>
+            </select>
+            <div class="small">
+              Device selection for stem splitting. MPS (Metal) acceleration is available on Apple Silicon Macs for faster processing.
+            </div>
+          </div>
+
+          <div class="row">
+            <label for="stem_split_export_format">Export Format</label>
+            <select id="stem_split_export_format" name="export_format">
+              <option value="wav" selected>WAV (Uncompressed)</option>
+              <option value="mp3">MP3 (256kbps)</option>
+            </select>
+            <div class="small">
+              Output format for the split stems. WAV provides highest quality, MP3 saves disk space.
+            </div>
+          </div>
+
+          <!-- Hidden field for output directory (synced from Settings) -->
+          <input id="stem_split_out_dir" name="out_dir" type="hidden" value="{{ default_out_dir or '' }}">
 
         </form>
 
@@ -1761,10 +1868,21 @@ HTML = r"""
             </span>
           </div>
           <div id="consolePanel" style="display:none;">
-            <div id="consoleOutput" class="console-output"></div>
-            <div class="small" style="margin-top:8px;opacity:0.7;">
-              Real-time server logs. Useful for troubleshooting errors.
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div class="small" style="opacity:0.7;">
+                Real-time server logs. Useful for troubleshooting errors.
+              </div>
+              <button 
+                id="consoleCopyBtn" 
+                type="button" 
+                class="btn secondary" 
+                style="padding:4px 12px;font-size:12px;"
+                onclick="CDMF.copyConsole && CDMF.copyConsole()"
+                title="Copy all console logs to clipboard">
+                📋 Copy Logs
+              </button>
             </div>
+            <div id="consoleOutput" class="console-output"></div>
           </div>
         </div>
 
@@ -1899,6 +2017,7 @@ HTML = r"""
   <script src="{{ url_for('static', filename='scripts/cdmf_training_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_mufun_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_voice_cloning_ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='scripts/cdmf_stem_splitting_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_lora_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_console.js') }}"></script>
 </body>

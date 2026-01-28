@@ -169,11 +169,29 @@ try:
 except Exception as e:
     print(f"[CDMF.spec] WARNING: collect_dynamic_libs('TTS') failed: {e} (TTS may not be installed)")
 
+# Collect data files for Demucs (stem splitting - optional component)
+_demucs_data = []
+try:
+    _demucs_data = collect_data_files('demucs')
+    if _demucs_data:
+        print(f"[CDMF.spec] Collected demucs data files: {len(_demucs_data)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_data_files('demucs') failed: {e} (Demucs may not be installed)")
+
+# Collect dynamic libraries for Demucs (if available)
+_demucs_binaries = []
+try:
+    _demucs_binaries = collect_dynamic_libs('demucs')
+    if _demucs_binaries:
+        print(f"[CDMF.spec] Collected demucs binaries: {len(_demucs_binaries)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_dynamic_libs('demucs') failed: {e} (Demucs may not be installed)")
+
 a = Analysis(
     ['aceforge_app.py'],
     pathex=[],
-    binaries=_lzma_binaries + _tokenizers_binaries + _tts_binaries + [
-        # _lzma, tokenizers, and TTS binaries are collected above
+    binaries=_lzma_binaries + _tokenizers_binaries + _tts_binaries + _demucs_binaries + [
+        # _lzma, tokenizers, TTS, and Demucs binaries are collected above
         # Additional binaries can be added here if needed
     ],
     datas=[
@@ -189,7 +207,7 @@ a = Analysis(
         ('presets.json', '.'),
         # Include VERSION file (placed in MacOS directory for frozen apps)
         ('VERSION', '.'),
-    ] + _py3langid_data + _acestep_lyrics_data + _tokenizers_data + _tts_data + _tts_vocoder_configs + _trainer_data + _gruut_data + _jamo_data,
+    ] + _py3langid_data + _acestep_lyrics_data + _tokenizers_data + _tts_data + _tts_vocoder_configs + _trainer_data + _gruut_data + _jamo_data + _demucs_data,
     hiddenimports=[
         'diffusers',
         'diffusers.loaders',
@@ -261,6 +279,14 @@ a = Analysis(
         'TTS.api',
         # Collect all TTS submodules (critical for frozen apps)
         *collect_submodules('TTS'),
+        # Stem splitting (Demucs library - optional component)
+        'cdmf_stem_splitting',
+        'cdmf_stem_splitting_bp',
+        'demucs',
+        'demucs.separate',
+        'demucs.pretrained',
+        # Collect all demucs submodules (critical for frozen apps)
+        *collect_submodules('demucs'),
         # TTS dependencies that might be missed by PyInstaller
         'coqpit',
         'trainer',

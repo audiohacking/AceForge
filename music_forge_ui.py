@@ -146,6 +146,14 @@ except Exception as _e:
     )
 
 # ---------------------------------------------------------------------------
+# Paths and TORCH_HOME (before any torch/torch.hub use)
+# Demucs stem splitting uses torch.hub for model download; cache must be writable.
+# ---------------------------------------------------------------------------
+import cdmf_paths
+from cdmf_paths import APP_VERSION
+os.environ.setdefault("TORCH_HOME", str(cdmf_paths.get_models_folder()))
+
+# ---------------------------------------------------------------------------
 # ACE-Step generation + progress callback
 # ---------------------------------------------------------------------------
 
@@ -159,8 +167,6 @@ from generate_ace import (
 
 from ace_model_setup import ace_models_present
 from cdmf_template import HTML
-import cdmf_paths
-from cdmf_paths import APP_VERSION
 import cdmf_state
 from cdmf_tracks import create_tracks_blueprint
 from cdmf_models import create_models_blueprint
@@ -335,6 +341,14 @@ if getattr(sys, 'frozen', False):
 # Wire ACE-Step's progress callback into our shared state
 register_progress_callback(cdmf_state.ace_progress_callback)
 
+# Wire stem splitting's progress callback into our shared state
+try:
+    from cdmf_stem_splitting import register_stem_split_progress_callback
+    register_stem_split_progress_callback(cdmf_state.ace_progress_callback)
+except (ImportError, Exception) as e:
+    # Stem splitting is optional
+    pass
+
 # UI defaults (mirroring previous inline constants)
 UI_DEFAULTS = {
     "target_seconds": int(DEFAULT_TARGET_SECONDS),
@@ -367,6 +381,14 @@ try:
 except (ImportError, Exception) as e:
     # Voice cloning is optional - if TTS library is not installed, skip it
     print(f"[AceForge] Voice cloning not available: {e}", flush=True)
+
+# Register stem splitting blueprint (optional component)
+try:
+    from cdmf_stem_splitting_bp import create_stem_splitting_blueprint
+    app.register_blueprint(create_stem_splitting_blueprint(html_template=HTML))
+except (ImportError, Exception) as e:
+    # Stem splitting is optional - if Demucs library is not installed, skip it
+    print(f"[AceForge] Stem splitting not available: {e}", flush=True)
 
 
 
@@ -510,6 +532,28 @@ def main() -> None:
                 cdmf_state.MODEL_STATUS["message"] = (
                     "ACE-Step model has not been downloaded yet."
                 )
+
+    # Stem splitting (Demucs) model status - optional
+    try:
+        from cdmf_stem_splitting import stem_split_models_present
+        if stem_split_models_present():
+            with cdmf_state.STEM_SPLIT_LOCK:
+                cdmf_state.STEM_SPLIT_STATUS["state"] = "ready"
+                cdmf_state.STEM_SPLIT_STATUS["message"] = "Demucs model is present."
+        else:
+            with cdmf_state.STEM_SPLIT_LOCK:
+                if cdmf_state.STEM_SPLIT_STATUS["state"] == "unknown":
+                    cdmf_state.STEM_SPLIT_STATUS["state"] = "absent"
+                    cdmf_state.STEM_SPLIT_STATUS["message"] = (
+                        "Demucs model has not been downloaded yet."
+                    )
+            print(
+                "[AceForge] Demucs (stem splitting) model is not downloaded yet. "
+                "Use the Stem Splitting tab and click \"Download Demucs models\" before first use.",
+                flush=True,
+            )
+    except ImportError:
+        pass
 
     print(
         f"Starting AceForge (ACE-Step Edition {APP_VERSION}) "

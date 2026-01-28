@@ -84,6 +84,18 @@ if ! "$PY" -c "from TTS.api import TTS" 2>/dev/null; then
 fi
 echo "[Build] TTS verified: from TTS.api import TTS OK"
 
+# Install Demucs for stem splitting (optional component)
+echo "[Build] Installing Demucs for stem splitting..."
+"$PY" -m pip install "demucs==4.0.1" --quiet
+if ! "$PY" -c "import demucs.separate" 2>/dev/null; then
+    echo "[Build] WARNING: Demucs installed but 'import demucs.separate' failed. Stem splitting will not work in the app."
+    echo "[Build] Run: $PY -c \"import demucs.separate\" to see the error."
+    "$PY" -c "import demucs.separate" || true
+    # Don't exit - stem splitting is optional
+else
+    echo "[Build] Demucs verified: import demucs.separate OK"
+fi
+
 "$PY" -m pip install "pyinstaller>=6.0" --quiet
 
 # Check for PyInstaller
