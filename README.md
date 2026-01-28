@@ -13,11 +13,12 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 
 - 100% Local _(only needs to download models once)_
 - Music Generation with **ACE-Step** prompts
+  - Use **Stem separation** to rebalance vocals vs instrumentals
   - Use existing **Audio** as reference _(optional)_ 
   - Train **ACE-Step LoRAs** from your own datasets
     - Mass-create `_prompt.txt` / `_lyrics.txt` files
     - Auto-tag datasets using **MuFun-ACEStep** _(experimental)_
-- **Stem Splitting** using **Demucs** for high-quality audio separation (2-stem, 4-stem, 6-stem modes)
+- Stem Splitting using **Demucs** for high-quality audio separation
 - Voice Cloning TTS using **XTTS v2**
 - Embedded **Music Player** to explore generation catalog
 - Manage and reuse **prompt presets**
@@ -66,9 +67,10 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 1. Launch AceForge and wait for the UI
 2. Go to **Generate** → create tracks from prompt (and lyrics if desired)
 3. Browse/manage tracks in **Music Player**
-4. (Optional) **Stem Splitting**: Separate audio into individual stems (vocals, drums, bass, other)
-5. (Optional) **Voice Clone**: TTS voice cloning using reference clips
-6. (Optional) Build a dataset and train a LoRA in **Training**
+4. (Optional) Use stem controls to adjust vocal/instrumental balance
+5. (Optional) **Stem Splitting**: Separate any audio file into individual stems
+6. (Optional) **Voice Clone**: TTS voice cloning using reference clips
+7. (Optional) Build a dataset and train a LoRA in **Training**
 
 
 
@@ -82,10 +84,21 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
   - Provide lyrics using markers like `[verse]`, `[chorus]`, `[solo]`, etc.
 - **Presets** let you save/load a whole “knob bundle” (text + sliders)
 
-## Stem Splitting with Demucs
+## Stem separation (vocals vs instrumentals)
 
-AceForge includes a dedicated **Stem Splitting** tab powered by **Demucs** for high-quality audio separation:
+AceForge can run `audio-separator` as a post-process step so you can rebalance:
+- Vocals level (dB)
+- Instrumental level (dB)
 
+For fast iteration: generate with both gains at `0 dB`, then only use stems once you like a track.
+
+> First use requires downloading a **large** stem model and adds a heavy processing step 
+
+## Stem Splitting (Demucs)
+
+The **Stem Splitting** tab uses **Demucs** for high-quality audio separation of any audio file.
+
+**Features:**
 - **2-stem mode**: Separate vocals and instrumentals
 - **4-stem mode**: Separate vocals, drums, bass, and other instruments
 - **6-stem mode**: Even finer separation including piano and guitar
