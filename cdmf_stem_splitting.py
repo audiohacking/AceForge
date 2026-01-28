@@ -435,28 +435,51 @@ def stem_split_models_present() -> bool:
     Check if the default Demucs model (htdemucs) is already in torch.hub cache.
     Models are stored in the AceForge models directory (configured via TORCH_HOME).
     Used to show "Download Demucs models" only when needed (first use).
+    
+    Demucs stores models in torch.hub/checkpoints/ as .th files (PyTorch model files).
     """
     try:
         # Ensure TORCH_HOME points to AceForge models directory
+        # Use assignment (not setdefault) to force update in case it was set elsewhere
         import cdmf_paths
         models_folder = cdmf_paths.get_models_folder()
-        os.environ.setdefault("TORCH_HOME", str(models_folder))
+        os.environ["TORCH_HOME"] = str(models_folder)
         
+        # Force torch.hub to re-read TORCH_HOME by ensuring it's set before calling get_dir()
         hub_dir = Path(torch.hub.get_dir())
         logger.debug(f"Checking for Demucs models in: {hub_dir}")
+        logger.debug(f"TORCH_HOME environment variable: {os.environ.get('TORCH_HOME')}")
         
         if not hub_dir.exists():
+            logger.debug(f"Torch hub directory does not exist: {hub_dir}")
             return False
-        # Demucs 4.x downloads to torch.hub; look for facebookresearch/demucs cache
+        
+        # Demucs 4.x stores models in hub/checkpoints/ as .th files
+        checkpoints_dir = hub_dir / "checkpoints"
+        if checkpoints_dir.exists() and checkpoints_dir.is_dir():
+            # Check for .th files (PyTorch model files) - Demucs models are typically large (>50MB)
+            for model_file in checkpoints_dir.iterdir():
+                if model_file.is_file() and model_file.suffix == ".th":
+                    # Check if file is substantial (at least 10MB to avoid false positives)
+                    if model_file.stat().st_size > 10 * 1024 * 1024:
+                        logger.info(f"Found Demucs model file at: {model_file} ({model_file.stat().st_size / (1024*1024):.1f} MB)")
+                        return True
+        
+        # Also check for legacy directory-based storage (older Demucs versions)
+        # Look for directories with "demucs" or "htdemucs" in the name
         for name in hub_dir.iterdir():
-            if name.is_dir() and "demucs" in name.name.lower():
+            if name.is_dir() and ("demucs" in name.name.lower() or "htdemucs" in name.name.lower()):
                 # Has content (model files)
                 if any(name.iterdir()):
-                    logger.debug(f"Found Demucs models in: {name}")
+                    logger.debug(f"Found Demucs models at: {name}")
                     return True
+        
+        logger.debug(f"No Demucs models found in: {hub_dir}")
         return False
     except Exception as e:
         logger.debug(f"Error checking for Demucs models: {e}")
+        import traceback
+        logger.debug(traceback.format_exc())
         return False
 
 
@@ -539,11 +562,23 @@ def ensure_stem_split_models(progress_cb: Optional[Callable[[float], None]] = No
                 logger.info(f"Model cache location: {hub_dir}")
                 if hub_dir.exists():
                     demucs_found = False
-                    for name in hub_dir.iterdir():
-                        if name.is_dir() and "demucs" in name.name.lower():
-                            if any(name.iterdir()):
-                                logger.info(f"✓ Found Demucs cache: {name}")
-                                demucs_found = True
+                    # Check for .th files in checkpoints directory
+                    checkpoints_dir = hub_dir / "checkpoints"
+                    if checkpoints_dir.exists():
+                        for model_file in checkpoints_dir.iterdir():
+                            if model_file.is_file() and model_file.suffix == ".th":
+                                if model_file.stat().st_size > 10 * 1024 * 1024:
+                                    logger.info(f"✓ Found Demucs model file: {model_file} ({model_file.stat().st_size / (1024*1024):.1f} MB)")
+                                    demucs_found = True
+                                    break
+                    # Also check for legacy directory-based storage
+                    if not demucs_found:
+                        for name in hub_dir.iterdir():
+                            if name.is_dir() and "demucs" in name.name.lower():
+                                if any(name.iterdir()):
+                                    logger.info(f"✓ Found Demucs cache: {name}")
+                                    demucs_found = True
+                                    break
                     if not demucs_found:
                         logger.warning("Demucs cache directory not found, but model loaded - may be in memory only")
                 

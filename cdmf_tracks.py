@@ -123,13 +123,13 @@ def get_audio_duration(path: Path) -> float:
 
 
 def list_music_files() -> List[str]:
-    """Return a sorted list of .wav and .mp3 files in the default music directory."""
+    """Return a sorted list of .wav, .mp3, and .mid files in the default music directory."""
     music_dir = Path(DEFAULT_OUT_DIR)
     if not music_dir.exists():
         return []
     names = [
         p.name for p in music_dir.iterdir()
-        if p.is_file() and p.suffix.lower() in (".wav", ".mp3")
+        if p.is_file() and p.suffix.lower() in (".wav", ".mp3", ".mid")
     ]
     return sorted(names, key=lambda n: n.lower())
 

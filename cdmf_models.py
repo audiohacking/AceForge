@@ -229,4 +229,87 @@ def create_models_blueprint() -> Blueprint:
     except ImportError:
         pass
 
+    # MIDI generation (basic-pitch) model status and ensure - only if MIDI generation is available
+    try:
+        from midi_model_setup import basic_pitch_models_present, ensure_basic_pitch_models
+        import cdmf_state
+
+        def _download_midi_models_worker() -> None:
+            """Background worker to pre-download basic-pitch model."""
+            cdmf_state.reset_progress()
+            with cdmf_state.PROGRESS_LOCK:
+                cdmf_state.GENERATION_PROGRESS["stage"] = "midi_model_download"
+                cdmf_state.GENERATION_PROGRESS["done"] = False
+                cdmf_state.GENERATION_PROGRESS["error"] = False
+                cdmf_state.GENERATION_PROGRESS["current"] = 0.0
+                cdmf_state.GENERATION_PROGRESS["total"] = 1.0
+            try:
+                def _progress(f: float) -> None:
+                    with cdmf_state.PROGRESS_LOCK:
+                        cdmf_state.GENERATION_PROGRESS["current"] = max(0.0, min(1.0, f))
+                ensure_basic_pitch_models(progress_cb=_progress)
+                with cdmf_state.MIDI_GEN_LOCK:
+                    cdmf_state.MIDI_GEN_STATUS["state"] = "ready"
+                    cdmf_state.MIDI_GEN_STATUS["message"] = "basic-pitch model is present."
+                with cdmf_state.PROGRESS_LOCK:
+                    cdmf_state.GENERATION_PROGRESS["current"] = 1.0
+                    cdmf_state.GENERATION_PROGRESS["stage"] = "done"
+                    cdmf_state.GENERATION_PROGRESS["done"] = True
+                    cdmf_state.GENERATION_PROGRESS["error"] = False
+            except Exception as exc:
+                with cdmf_state.MIDI_GEN_LOCK:
+                    cdmf_state.MIDI_GEN_STATUS["state"] = "error"
+                    cdmf_state.MIDI_GEN_STATUS["message"] = f"Failed to download basic-pitch model: {exc}"
+                with cdmf_state.PROGRESS_LOCK:
+                    cdmf_state.GENERATION_PROGRESS["stage"] = "error"
+                    cdmf_state.GENERATION_PROGRESS["done"] = True
+                    cdmf_state.GENERATION_PROGRESS["error"] = True
+
+        @bp.route("/models/midi_gen/status", methods=["GET"])
+        def models_midi_gen_status():
+            """Report whether the basic-pitch (MIDI generation) model is available."""
+            with cdmf_state.MIDI_GEN_LOCK:
+                state = cdmf_state.MIDI_GEN_STATUS["state"]
+            if state not in ("downloading", "ready"):
+                if basic_pitch_models_present():
+                    with cdmf_state.MIDI_GEN_LOCK:
+                        cdmf_state.MIDI_GEN_STATUS["state"] = "ready"
+                        cdmf_state.MIDI_GEN_STATUS["message"] = "basic-pitch model is present."
+                else:
+                    with cdmf_state.MIDI_GEN_LOCK:
+                        if cdmf_state.MIDI_GEN_STATUS["state"] == "unknown":
+                            cdmf_state.MIDI_GEN_STATUS["state"] = "absent"
+                            cdmf_state.MIDI_GEN_STATUS["message"] = (
+                                "basic-pitch model has not been downloaded yet."
+                            )
+            with cdmf_state.MIDI_GEN_LOCK:
+                state = cdmf_state.MIDI_GEN_STATUS["state"]
+                message = cdmf_state.MIDI_GEN_STATUS["message"]
+            return jsonify({"ok": True, "ready": state == "ready", "state": state, "message": message})
+
+        @bp.route("/models/midi_gen/ensure", methods=["POST"])
+        def models_midi_gen_ensure():
+            """Trigger a background download of the basic-pitch model if not present."""
+            with cdmf_state.MIDI_GEN_LOCK:
+                state = cdmf_state.MIDI_GEN_STATUS["state"]
+            if state == "ready":
+                return jsonify({"ok": True, "already_ready": True})
+            if state == "downloading":
+                return jsonify({"ok": True, "already_downloading": True})
+            if basic_pitch_models_present():
+                with cdmf_state.MIDI_GEN_LOCK:
+                    cdmf_state.MIDI_GEN_STATUS["state"] = "ready"
+                    cdmf_state.MIDI_GEN_STATUS["message"] = "basic-pitch model is present."
+                return jsonify({"ok": True, "already_ready": True})
+            with cdmf_state.MIDI_GEN_LOCK:
+                cdmf_state.MIDI_GEN_STATUS["state"] = "downloading"
+                cdmf_state.MIDI_GEN_STATUS["message"] = (
+                    "Downloading basic-pitch model. This may take several minutes (first use only)."
+                )
+            import threading
+            threading.Thread(target=_download_midi_models_worker, daemon=True).start()
+            return jsonify({"ok": True, "started": True})
+    except ImportError:
+        pass
+
     return bp

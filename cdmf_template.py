@@ -13,6 +13,9 @@ HTML = r"""
 
   <!-- External CSS instead of inline <style> -->
   <link rel="stylesheet" href="{{ url_for('static', filename='scripts/cdmf.css') }}">
+  
+  <!-- MIDIjs library for MIDI file playback -->
+  <script type='text/javascript' src='//www.midijs.net/lib/midi.js'></script>
 </head>
 <body>
   <div class="page">
@@ -68,6 +71,13 @@ HTML = r"""
             data-mode="stem_split"
             onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('stem_split');">
             Stem Splitting
+          </button>
+          <button
+            type="button"
+            class="tab-btn mode-tab-btn"
+            data-mode="midi_gen"
+            onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('midi_gen');">
+            MIDI Generation
           </button>
         </div>
 
@@ -1005,6 +1015,159 @@ HTML = r"""
 
         </form>
 
+        <!-- MIDI Generation form card (mode: midi_gen) ----------------------------- -->
+        <form
+          id="midiGenForm"
+          class="card card-mode"
+          data-mode="midi_gen"
+          method="post"
+          action="{{ url_for('cdmf_midi_generation.midi_generate') }}"
+          enctype="multipart/form-data"
+          onsubmit="return CDMF.onSubmitMidiGen(event)"
+          style="display:none;">
+          <div class="card-header-row">
+            <div style="flex:1;min-width:0;">
+              <h2>MIDI Generation</h2>
+              <div id="midiGenLoadingBar" class="loading-bar" style="display:none;">
+                <div class="loading-bar-inner"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button id="midiGenButton" type="submit" class="btn primary">
+                <span class="icon">🎹</span><span>Generate MIDI</span>
+              </button>
+              <button id="midiGenDownloadModelsBtn" type="button" class="btn secondary" style="display:none;">
+                <span class="icon">⬇</span><span>Download basic-pitch models</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="small" style="margin-top:8px;margin-bottom:16px;">
+            Convert audio files to MIDI using basic-pitch (Spotify's audio-to-MIDI converter). Upload an audio file and adjust parameters to generate MIDI output.
+          </div>
+
+          <div id="midiGenModelStatusNotice" class="toast" style="margin-top:8px;margin-bottom:16px;display:none;">
+            basic-pitch model is not downloaded yet. Click "Download basic-pitch models" below to download it (first use only). This is a one-time download; progress is shown in the loading bar.
+          </div>
+
+          <div class="row">
+            <label for="midi_gen_input_file">Input Audio File</label>
+            <input
+              id="midi_gen_input_file"
+              name="input_file"
+              type="file"
+              accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg"
+              required>
+            <div class="small">
+              Upload an audio file (MP3, WAV, M4A, FLAC, or OGG) to convert to MIDI. Audio will be automatically downmixed to mono and resampled to 22050 Hz.
+            </div>
+          </div>
+
+          <div class="row">
+            <label for="midi_gen_output_filename">Output Filename</label>
+            <input
+              id="midi_gen_output_filename"
+              name="output_filename"
+              type="text"
+              placeholder="output_midi"
+              value="">
+            <div class="small">
+              Output filename (without extension). Will be saved as .mid in the output directory. If left empty, uses input filename + "_midi".
+            </div>
+          </div>
+
+          <hr style="border:none;border-top:1px solid #111827;margin:16px 0 8px;">
+
+          <div class="small" style="font-weight:600;opacity:0.9;margin-bottom:8px;">
+            Detection Parameters
+          </div>
+
+          <div class="slider-row">
+            <label for="midi_gen_onset_threshold">Onset Threshold</label>
+            <input id="midi_gen_onset_threshold_range" type="range" min="0.0" max="1.0" step="0.01"
+                   value="0.5" oninput="CDMF.syncRange('midi_gen_onset_threshold', 'midi_gen_onset_threshold_range')">
+            <input id="midi_gen_onset_threshold" name="onset_threshold" type="number" min="0.0" max="1.0" step="0.01"
+                   value="0.5" oninput="CDMF.syncNumber('midi_gen_onset_threshold', 'midi_gen_onset_threshold_range')">
+            <div class="small">Minimum energy required for an onset to be considered present (0.0-1.0). Higher values reduce false positives.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="midi_gen_frame_threshold">Frame Threshold</label>
+            <input id="midi_gen_frame_threshold_range" type="range" min="0.0" max="1.0" step="0.01"
+                   value="0.3" oninput="CDMF.syncRange('midi_gen_frame_threshold', 'midi_gen_frame_threshold_range')">
+            <input id="midi_gen_frame_threshold" name="frame_threshold" type="number" min="0.0" max="1.0" step="0.01"
+                   value="0.3" oninput="CDMF.syncNumber('midi_gen_frame_threshold', 'midi_gen_frame_threshold_range')">
+            <div class="small">Minimum energy requirement for a frame to be considered present (0.0-1.0). Higher values reduce note detection sensitivity.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="midi_gen_minimum_note_length_ms">Minimum Note Length (ms)</label>
+            <input id="midi_gen_minimum_note_length_ms_range" type="range" min="0" max="500" step="1"
+                   value="127.7" oninput="CDMF.syncRange('midi_gen_minimum_note_length_ms', 'midi_gen_minimum_note_length_ms_range')">
+            <input id="midi_gen_minimum_note_length_ms" name="minimum_note_length_ms" type="number" min="0" max="500" step="0.1"
+                   value="127.7" oninput="CDMF.syncNumber('midi_gen_minimum_note_length_ms', 'midi_gen_minimum_note_length_ms_range')">
+            <div class="small">Minimum allowed note length in milliseconds. Shorter notes will be filtered out.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="midi_gen_minimum_frequency">Minimum Frequency (Hz)</label>
+            <input id="midi_gen_minimum_frequency" name="minimum_frequency" type="number" min="0" step="1"
+                   value="" placeholder="None">
+            <div class="small">Minimum allowed output frequency in Hz. Leave empty for no limit. Useful for filtering out low-frequency noise.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="midi_gen_maximum_frequency">Maximum Frequency (Hz)</label>
+            <input id="midi_gen_maximum_frequency" name="maximum_frequency" type="number" min="0" step="1"
+                   value="" placeholder="None">
+            <div class="small">Maximum allowed output frequency in Hz. Leave empty for no limit. Useful for focusing on specific instrument ranges.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="midi_gen_midi_tempo">MIDI Tempo (BPM)</label>
+            <input id="midi_gen_midi_tempo_range" type="range" min="60" max="200" step="1"
+                   value="120" oninput="CDMF.syncRange('midi_gen_midi_tempo', 'midi_gen_midi_tempo_range')">
+            <input id="midi_gen_midi_tempo" name="midi_tempo" type="number" min="60" max="200" step="1"
+                   value="120" oninput="CDMF.syncNumber('midi_gen_midi_tempo', 'midi_gen_midi_tempo_range')">
+            <div class="small">MIDI tempo in beats per minute. This affects the timing grid but not the actual detected notes.</div>
+          </div>
+
+          <hr style="border:none;border-top:1px solid #111827;margin:16px 0 8px;">
+
+          <div class="small" style="font-weight:600;opacity:0.9;margin-bottom:8px;">
+            Advanced Options
+          </div>
+
+          <div class="row">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input
+                id="midi_gen_multiple_pitch_bends"
+                name="multiple_pitch_bends"
+                type="checkbox"
+                value="true">
+              Allow Multiple Pitch Bends
+            </label>
+            <div class="small">Allow overlapping notes in MIDI file to have pitch bends. May produce more complex MIDI files.</div>
+          </div>
+
+          <div class="row">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input
+                id="midi_gen_melodia_trick"
+                name="melodia_trick"
+                type="checkbox"
+                checked
+                value="true">
+              Use Melodia Post-Processing
+            </label>
+            <div class="small">Use the melodia post-processing step for improved note detection. Recommended for most cases.</div>
+          </div>
+
+          <!-- Hidden field for output directory (synced from Settings) -->
+          <input id="midi_gen_out_dir" name="out_dir" type="hidden" value="{{ default_out_dir or '' }}">
+
+        </form>
+
         <!-- Training card: ACE-Step LoRA skeleton (mode: train) --------------- -->
         <form
           id="trainForm"
@@ -1810,7 +1973,7 @@ HTML = r"""
                   {% for name in tracks %}
                     <option value="{{ url_for('cdmf_tracks.serve_music', filename=name) }}"
                             {% if current_track == name %}selected{% endif %}>
-                      {{ name[:-4] if (name.lower().endswith('.wav') or name.lower().endswith('.mp3')) else name }}
+                      {{ name[:-4] if (name.lower().endswith('.wav') or name.lower().endswith('.mp3') or name.lower().endswith('.mid')) else name }}
                     </option>
                   {% endfor %}
                 {% else %}
@@ -2018,6 +2181,7 @@ HTML = r"""
   <script src="{{ url_for('static', filename='scripts/cdmf_mufun_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_voice_cloning_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_stem_splitting_ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='scripts/cdmf_midi_generation_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_lora_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_console.js') }}"></script>
 </body>

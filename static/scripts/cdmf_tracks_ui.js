@@ -56,9 +56,10 @@
   function selectAndPlayTrack(trackName) {
     const list = document.getElementById("trackList");
     const audio = document.getElementById("audioPlayer");
-    if (!list || !audio || !trackName) return;
+    if (!list || !trackName) return;
 
     const url = "/music/" + encodeURIComponent(trackName);
+    const isMidi = trackName.toLowerCase().endsWith('.mid') || trackName.toLowerCase().endsWith('.midi');
 
     // Ensure the hidden <select> has an option for this track.
     let matched = false;
@@ -73,21 +74,39 @@
     if (!matched) {
       const opt = document.createElement("option");
       opt.value = url;
-      opt.textContent = (trackName || "").replace(/\.(wav|mp3)$/i, "");
+      opt.textContent = (trackName || "").replace(/\.(wav|mp3|mid|midi)$/i, "");
       list.appendChild(opt);
       list.value = url;
     } else {
       list.value = url;
     }
 
-    // Update the audio element.
+    // Update playback based on file type
     if (window.candyIsGenerating) {
       return;
     }
-    audio.pause();
-    audio.currentTime = 0;
-    audio.src = url;
-    audio.play().catch(function () {});
+    
+    if (isMidi) {
+      // Stop any current MIDI playback
+      if (window.CDMF && typeof window.CDMF.stopMidiPlayback === 'function') {
+        window.CDMF.stopMidiPlayback();
+      }
+      // Start MIDI playback using the player UI function (updates state correctly)
+      if (window.CDMF && typeof window.CDMF.startMidiPlayback === 'function') {
+        window.CDMF.startMidiPlayback(url);
+      } else if (window.MIDIjs && typeof window.MIDIjs.play === 'function') {
+        // Fallback if startMidiPlayback not available
+        window.MIDIjs.play(url);
+      }
+    } else {
+      // Audio file playback
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.src = url;
+        audio.play().catch(function () {});
+      }
+    }
 
     // Highlight the active row.
     const panel = document.getElementById("trackListPanel");

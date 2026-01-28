@@ -96,6 +96,18 @@ else
     echo "[Build] Demucs verified: import demucs.separate OK"
 fi
 
+# Install basic-pitch for MIDI generation (optional component)
+echo "[Build] Installing basic-pitch for MIDI generation..."
+"$PY" -m pip install "basic-pitch>=0.4.0" --quiet
+if ! "$PY" -c "from basic_pitch.inference import predict" 2>/dev/null; then
+    echo "[Build] WARNING: basic-pitch installed but 'from basic_pitch.inference import predict' failed. MIDI generation will not work in the app."
+    echo "[Build] Run: $PY -c \"from basic_pitch.inference import predict\" to see the error."
+    "$PY" -c "from basic_pitch.inference import predict" || true
+    # Don't exit - MIDI generation is optional
+else
+    echo "[Build] basic-pitch verified: from basic_pitch.inference import predict OK"
+fi
+
 "$PY" -m pip install "pyinstaller>=6.0" --quiet
 
 # Check for PyInstaller

@@ -110,6 +110,15 @@ try:
 except Exception as e:
     print(f"[CDMF.spec] WARNING: collect_data_files('tokenizers') failed: {e}")
 
+# Collect data files for basic-pitch (MIDI generation - optional component)
+_basic_pitch_data = []
+try:
+    _basic_pitch_data = collect_data_files('basic_pitch')
+    if _basic_pitch_data:
+        print(f"[CDMF.spec] Collected basic_pitch data files: {len(_basic_pitch_data)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_data_files('basic_pitch') failed: {e} (basic-pitch may not be installed)")
+
 # Collect data files for TTS (voice cloning - optional component)
 _tts_data = []
 try:
@@ -207,7 +216,7 @@ a = Analysis(
         ('presets.json', '.'),
         # Include VERSION file (placed in MacOS directory for frozen apps)
         ('VERSION', '.'),
-    ] + _py3langid_data + _acestep_lyrics_data + _tokenizers_data + _tts_data + _tts_vocoder_configs + _trainer_data + _gruut_data + _jamo_data + _demucs_data,
+    ] + _py3langid_data + _acestep_lyrics_data + _tokenizers_data + _basic_pitch_data + _tts_data + _tts_vocoder_configs + _trainer_data + _gruut_data + _jamo_data + _demucs_data,
     hiddenimports=[
         'diffusers',
         'diffusers.loaders',
@@ -287,6 +296,17 @@ a = Analysis(
         'demucs.pretrained',
         # Collect all demucs submodules (critical for frozen apps)
         *collect_submodules('demucs'),
+        # MIDI generation (basic-pitch library - optional component)
+        'cdmf_midi_generation',
+        'cdmf_midi_generation_bp',
+        'midi_model_setup',
+        'basic_pitch',
+        'basic_pitch.inference',
+        'basic_pitch.note_creation',
+        'basic_pitch.constants',
+        'basic_pitch.commandline_printing',
+        # Collect all basic_pitch submodules (critical for frozen apps)
+        *collect_submodules('basic_pitch'),
         # TTS dependencies that might be missed by PyInstaller
         'coqpit',
         'trainer',

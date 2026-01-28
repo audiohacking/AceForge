@@ -390,6 +390,14 @@ except (ImportError, Exception) as e:
     # Stem splitting is optional - if Demucs library is not installed, skip it
     print(f"[AceForge] Stem splitting not available: {e}", flush=True)
 
+# Register MIDI generation blueprint (optional component)
+try:
+    from cdmf_midi_generation_bp import create_midi_generation_blueprint
+    app.register_blueprint(create_midi_generation_blueprint(html_template=HTML))
+except (ImportError, Exception) as e:
+    # MIDI generation is optional - if basic-pitch library is not installed, skip it
+    print(f"[AceForge] MIDI generation not available: {e}", flush=True)
+
 
 
 # ---------------------------------------------------------------------------
@@ -550,6 +558,28 @@ def main() -> None:
             print(
                 "[AceForge] Demucs (stem splitting) model is not downloaded yet. "
                 "Use the Stem Splitting tab and click \"Download Demucs models\" before first use.",
+                flush=True,
+            )
+    except ImportError:
+        pass
+
+    # MIDI generation (basic-pitch) model status - optional
+    try:
+        from midi_model_setup import basic_pitch_models_present
+        if basic_pitch_models_present():
+            with cdmf_state.MIDI_GEN_LOCK:
+                cdmf_state.MIDI_GEN_STATUS["state"] = "ready"
+                cdmf_state.MIDI_GEN_STATUS["message"] = "basic-pitch model is present."
+        else:
+            with cdmf_state.MIDI_GEN_LOCK:
+                if cdmf_state.MIDI_GEN_STATUS["state"] == "unknown":
+                    cdmf_state.MIDI_GEN_STATUS["state"] = "absent"
+                    cdmf_state.MIDI_GEN_STATUS["message"] = (
+                        "basic-pitch model has not been downloaded yet."
+                    )
+            print(
+                "[AceForge] basic-pitch (MIDI generation) model is not downloaded yet. "
+                "Use the MIDI Generation tab and click \"Download basic-pitch models\" before first use.",
                 flush=True,
             )
     except ImportError:

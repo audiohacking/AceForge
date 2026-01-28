@@ -15,6 +15,7 @@ anyio==4.11.0
 attrs==25.4.0
 audioread==3.1.0
 # audio-separator==0.40.0
+basic-pitch>=0.4.0
 demucs==4.0.1
 beartype==0.22.8
 blinker==1.9.0
