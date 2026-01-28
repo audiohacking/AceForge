@@ -13,7 +13,6 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 
 - 100% Local _(only needs to download models once)_
 - Music Generation with **ACE-Step** prompts
-  - Use **Stem splitting** with Demucs to separate vocals, drums, bass, and other instruments
   - Use existing **Audio** as reference _(optional)_ 
   - Train **ACE-Step LoRAs** from your own datasets
     - Mass-create `_prompt.txt` / `_lyrics.txt` files
@@ -88,12 +87,12 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 AceForge includes a dedicated **Stem Splitting** tab powered by **Demucs** for high-quality audio separation:
 
 - **2-stem mode**: Separate vocals and instrumentals
-- **4-stem mode**: Separate vocals, drums, bass, and other instruments  
+- **4-stem mode**: Separate vocals, drums, bass, and other instruments
 - **6-stem mode**: Even finer separation including piano and guitar
 
 Upload any audio file (MP3, WAV, etc.) and AceForge will split it into individual stem tracks that appear in the Music Player.
 
-> First use requires downloading the Demucs model (~80MB). Processing time varies based on file length and your device (Apple Silicon MPS is faster than CPU) 
+> First use requires downloading the Demucs model (~80MB). Processing time varies based on file length and your device (Apple Silicon MPS is faster than CPU)
 
 ## Voice cloning (XTTS v2)
 
