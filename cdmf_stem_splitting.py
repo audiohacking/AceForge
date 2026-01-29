@@ -15,15 +15,12 @@ from __future__ import annotations
 
 import os
 import platform
-import tempfile
 import logging
-import traceback
 import ssl
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple, Callable
+from typing import Optional, Dict, Callable
 
 import torch
-import inspect
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +187,7 @@ class StemSplitter:
             return
             
         try:
-            import demucs.separate
+            import demucs.separate  # noqa: F401 - Import needed to verify Demucs is available
         except ImportError as e:
             raise ImportError(
                 "Demucs library not installed. Install with: pip install demucs. (Original: %s)" % e
@@ -305,7 +302,6 @@ class StemSplitter:
             # Demucs will use the device based on PyTorch's default
             # We can't directly pass device to demucs.separate.main, but
             # we can set torch's default device before calling
-            original_device = None
             try:
                 if self.device.type == "mps":
                     # MPS is already set as default via torch.device("mps")
@@ -567,7 +563,6 @@ def ensure_stem_split_models(progress_cb: Optional[Callable[[float], None]] = No
         import tempfile
         import wave
         import traceback
-        import sys
         
         tmp_dir = Path(tempfile.mkdtemp(prefix="aceforge_stem_dl_"))
         try:
@@ -594,11 +589,9 @@ def ensure_stem_split_models(progress_cb: Optional[Callable[[float], None]] = No
             
             logger.info("Importing Demucs modules...")
             from demucs.pretrained import get_model
-            from demucs.separate import load_track, apply_model, save_audio
-            from demucs.audio import convert_audio
             
-            logger.info(f"Triggering Demucs model download...")
-            logger.info(f"  Model: htdemucs")
+            logger.info("Triggering Demucs model download...")
+            logger.info("  Model: htdemucs")
             logger.info(f"  Torch hub cache: {torch.hub.get_dir()}")
             
             # Instead of using argparse (which causes AssertionError in frozen app),
