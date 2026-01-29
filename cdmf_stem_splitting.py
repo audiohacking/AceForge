@@ -17,6 +17,7 @@ import os
 import platform
 import logging
 import ssl
+import threading
 from pathlib import Path
 from typing import Optional, Dict, Callable
 
@@ -30,6 +31,9 @@ os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
 # Progress callback for stem splitting
 _stem_split_progress_callback: Optional[Callable[[float, str], None]] = None
+
+# Thread lock for SSL context manager to prevent race conditions
+_ssl_context_lock = threading.Lock()
 
 
 class _SSLContextManager:
@@ -49,6 +53,7 @@ class _SSLContextManager:
     - The risk is mitigated by checksums that PyTorch Hub validates after download
     - SSL verification is properly restored after the download completes
     - This only affects model downloads, not any other network operations in the application
+    - Thread-safe: uses a lock to prevent race conditions when multiple threads download models
     
     This is considered an acceptable tradeoff because:
     1. Model downloads are from official PyTorch Hub (trusted source)
@@ -58,30 +63,61 @@ class _SSLContextManager:
     """
     
     def __init__(self):
-        # Initialize in __init__ to ensure it's set even if __enter__ fails
-        self._original_context = ssl._create_default_https_context
+        # Don't capture context in __init__ - we'll capture it in __enter__
+        # This ensures we always restore to the correct context
+        self._original_context = None
         self._unverified_context = ssl._create_unverified_context
+        self._lock_acquired = False
         
     def __enter__(self):
         """
         Disable SSL certificate verification.
         Downloads are from PyTorch Hub (download.pytorch.org), a trusted source.
+        Thread-safe: acquires a lock to prevent race conditions.
         """
-        try:
-            # Temporarily disable SSL verification for model downloads
-            ssl._create_default_https_context = self._unverified_context
-            logger.debug("SSL certificate verification disabled for model download from PyTorch Hub")
-        except Exception as e:
-            logger.warning(f"Could not disable SSL verification: {e}")
+        # Acquire lock to prevent race conditions with concurrent downloads
+        _ssl_context_lock.acquire()
+        self._lock_acquired = True
+        
+        # Capture the current SSL context (may have changed since __init__)
+        self._original_context = ssl._create_default_https_context
+        
+        # Temporarily disable SSL verification for model downloads
+        ssl._create_default_https_context = self._unverified_context
+        logger.debug("SSL certificate verification disabled for model download from PyTorch Hub")
+        
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Restore SSL certificate verification to its original state."""
+        """
+        Restore SSL certificate verification to its original state.
+        Always restores SSL context, even if an exception occurred.
+        """
         try:
-            ssl._create_default_https_context = self._original_context
-            logger.debug("SSL certificate verification restored")
+            # Restore SSL verification
+            if self._original_context is not None:
+                ssl._create_default_https_context = self._original_context
+                logger.debug("SSL certificate verification restored")
+            else:
+                # Fallback: restore to default if original context was not captured
+                ssl._create_default_https_context = ssl.create_default_context
+                logger.warning("SSL context restored to default (original context was not captured)")
         except Exception as e:
-            logger.warning(f"Could not restore SSL verification: {e}")
+            # Log error but don't suppress the original exception
+            logger.error(f"Failed to restore SSL verification: {e}. This could leave SSL verification disabled!")
+            # Try emergency restoration
+            try:
+                ssl._create_default_https_context = ssl.create_default_context
+                logger.info("Emergency SSL context restoration to default successful")
+            except Exception:
+                logger.critical("Emergency SSL context restoration failed! SSL verification may be disabled!")
+        finally:
+            # Always release the lock
+            if self._lock_acquired:
+                _ssl_context_lock.release()
+                self._lock_acquired = False
+        
+        # Don't suppress exceptions
         return False
 
 

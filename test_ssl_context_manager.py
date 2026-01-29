@@ -30,9 +30,12 @@ def test_ssl_context_manager():
         current = ssl._create_default_https_context
         print(f"Current SSL context: {current}")
         
-        # Verify that the context was changed
-        if current != original:
-            print("✓ SSL context changed successfully")
+        # Verify that the context was changed to unverified context
+        unverified = ssl._create_unverified_context
+        if current == unverified:
+            print("✓ SSL context changed to unverified context successfully")
+        elif current != original:
+            print("✓ SSL context changed (but not to expected unverified context)")
         else:
             print("✗ SSL context was not changed")
             return False
@@ -42,10 +45,10 @@ def test_ssl_context_manager():
     print(f"\nRestored SSL context: {restored}")
     
     if restored == original:
-        print("✓ SSL context restored successfully")
+        print("✓ SSL context restored successfully to original")
         return True
     else:
-        print("✗ SSL context was not restored")
+        print("✗ SSL context was not restored to original")
         return False
 
 
