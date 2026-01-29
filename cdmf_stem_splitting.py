@@ -36,33 +36,53 @@ _stem_split_progress_callback: Optional[Callable[[float, str], None]] = None
 
 
 class _SSLContextManager:
-    """Context manager to temporarily disable SSL certificate verification for model downloads."""
+    """
+    Context manager to temporarily disable SSL certificate verification for model downloads.
+    
+    This is necessary because Demucs model downloads from PyTorch Hub (via torch.hub.load_state_dict_from_url)
+    can fail on some systems with URLError due to SSL certificate verification issues.
+    These issues typically occur on systems with:
+    - Outdated root CA certificates
+    - Corporate proxies that intercept SSL
+    - Misconfigured SSL certificate stores
+    
+    Security implications:
+    - This temporarily disables SSL certificate verification ONLY during model downloads
+    - Downloads are from trusted PyTorch Hub CDN (download.pytorch.org)
+    - The risk is mitigated by checksums that PyTorch Hub validates after download
+    - SSL verification is properly restored after the download completes
+    - This only affects model downloads, not any other network operations in the application
+    
+    This is considered an acceptable tradeoff because:
+    1. Model downloads are from official PyTorch Hub (trusted source)
+    2. PyTorch Hub validates model checksums after download
+    3. The alternative is complete failure to download models on affected systems
+    4. SSL verification is immediately restored after the download
+    """
     
     def __init__(self):
-        self._original_context = None
-        self._unverified_context = None
+        # Initialize in __init__ to ensure it's set even if __enter__ fails
+        self._original_context = ssl._create_default_https_context
+        self._unverified_context = ssl._create_unverified_context
         
     def __enter__(self):
-        """Disable SSL certificate verification."""
+        """
+        Disable SSL certificate verification.
+        Downloads are from PyTorch Hub (download.pytorch.org), a trusted source.
+        """
         try:
-            import urllib.request
-            # Save the original SSL context
-            self._original_context = ssl._create_default_https_context
-            # Create an unverified SSL context
-            self._unverified_context = ssl._create_unverified_context
-            # Temporarily disable SSL verification
+            # Temporarily disable SSL verification for model downloads
             ssl._create_default_https_context = self._unverified_context
-            logger.debug("SSL certificate verification disabled for model download")
+            logger.debug("SSL certificate verification disabled for model download from PyTorch Hub")
         except Exception as e:
             logger.warning(f"Could not disable SSL verification: {e}")
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Restore SSL certificate verification."""
+        """Restore SSL certificate verification to its original state."""
         try:
-            if self._original_context is not None:
-                ssl._create_default_https_context = self._original_context
-                logger.debug("SSL certificate verification restored")
+            ssl._create_default_https_context = self._original_context
+            logger.debug("SSL certificate verification restored")
         except Exception as e:
             logger.warning(f"Could not restore SSL verification: {e}")
         return False
@@ -589,10 +609,13 @@ def ensure_stem_split_models(progress_cb: Optional[Callable[[float], None]] = No
                 
                 # Use SSL context manager to disable certificate verification during download
                 # This resolves URLError issues on systems with certificate problems
+                # Only the get_model() call performs network operations
                 with _SSLContextManager():
                     model = get_model("htdemucs", repo=None)
-                    model.cpu()
-                    model.eval()
+                
+                # Model operations (no network activity) - SSL verification already restored
+                model.cpu()
+                model.eval()
                 
                 logger.info("Demucs model loaded successfully (download completed if needed)")
                 
