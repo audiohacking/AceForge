@@ -1058,6 +1058,588 @@ def download_model_if_needed(model_name, url):
     return model_path
 ```
 
+### macOS User Directory Standards
+
+macOS has specific conventions for where applications should store different types of files. Following these standards ensures your app:
+- Works correctly in sandboxed environments
+- Integrates properly with system backup tools (Time Machine)
+- Respects user privacy and security expectations
+- Follows Apple's App Store guidelines
+
+#### Standard macOS Directories
+
+**Directory Structure:**
+
+```
+~/Library/
+├── Application Support/YourApp/    # App data, models, databases
+├── Caches/YourApp/                 # Temporary cache files
+├── Logs/YourApp/                   # Application logs
+└── Preferences/                    # Settings and preferences
+    └── com.yourcompany.yourapp.plist
+```
+
+#### 1. Application Support Directory
+
+**Purpose**: Persistent app data, user-generated content, downloaded models, databases
+
+**Path**: `~/Library/Application Support/YourApp/`
+
+**Use for**:
+- AI/ML models
+- User databases
+- Plugin data
+- Downloaded content
+- App-specific data files
+
+**Example Implementation:**
+
+```python
+from pathlib import Path
+import platform
+
+def get_app_support_dir(app_name: str = "YourApp") -> Path:
+    """
+    Get the Application Support directory for your app.
+    
+    Returns:
+        Path to ~/Library/Application Support/YourApp/ on macOS
+        Falls back to app directory on other platforms
+    """
+    if platform.system() == "Darwin":  # macOS
+        app_support = Path.home() / "Library" / "Application Support" / app_name
+        app_support.mkdir(parents=True, exist_ok=True)
+        return app_support
+    else:
+        # Fallback for Windows/Linux
+        return Path(__file__).parent
+
+def get_models_dir(app_name: str = "YourApp") -> Path:
+    """Get the models directory within App Support"""
+    models_dir = get_app_support_dir(app_name) / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    return models_dir
+
+def get_data_dir(app_name: str = "YourApp") -> Path:
+    """Get the data directory within App Support"""
+    data_dir = get_app_support_dir(app_name) / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
+
+# Usage:
+models_path = get_models_dir("YourApp")
+model_file = models_path / "my_model.bin"
+```
+
+#### 2. Preferences Directory
+
+**Purpose**: User preferences, settings, configuration
+
+**Path**: `~/Library/Preferences/com.yourcompany.yourapp.plist` (traditional)
+or `~/Library/Preferences/com.yourcompany.yourapp/` (custom directory)
+
+**Use for**:
+- User settings
+- UI preferences
+- Configuration options
+- Feature flags
+
+**Example Implementation:**
+
+```python
+import json
+from pathlib import Path
+import platform
+
+def get_preferences_dir(bundle_id: str = "com.yourcompany.yourapp") -> Path:
+    """
+    Get the preferences directory for your app.
+    
+    Args:
+        bundle_id: Reverse-DNS style bundle identifier (e.g., "com.yourcompany.yourapp")
+    
+    Returns:
+        Path to ~/Library/Preferences/com.yourcompany.yourapp/ on macOS
+    """
+    if platform.system() == "Darwin":  # macOS
+        prefs_dir = Path.home() / "Library" / "Preferences" / bundle_id
+        prefs_dir.mkdir(parents=True, exist_ok=True)
+        return prefs_dir
+    else:
+        # Fallback for Windows/Linux
+        return Path(__file__).parent
+
+def load_preferences(bundle_id: str = "com.yourcompany.yourapp") -> dict:
+    """Load app preferences from JSON file"""
+    prefs_dir = get_preferences_dir(bundle_id)
+    prefs_file = prefs_dir / "settings.json"
+    
+    if prefs_file.exists():
+        try:
+            with open(prefs_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Failed to load preferences: {e}")
+    
+    # Return defaults
+    return {
+        "ui_zoom": 100,
+        "theme": "light",
+        "auto_save": True,
+    }
+
+def save_preferences(prefs: dict, bundle_id: str = "com.yourcompany.yourapp") -> None:
+    """Save app preferences to JSON file"""
+    prefs_dir = get_preferences_dir(bundle_id)
+    prefs_file = prefs_dir / "settings.json"
+    
+    try:
+        with open(prefs_file, 'w', encoding='utf-8') as f:
+            json.dump(prefs, f, indent=2)
+    except Exception as e:
+        print(f"Warning: Failed to save preferences: {e}")
+
+# Usage:
+prefs = load_preferences("com.yourcompany.yourapp")
+zoom = prefs.get("ui_zoom", 100)
+
+prefs["ui_zoom"] = 120
+save_preferences(prefs, "com.yourcompany.yourapp")
+```
+
+#### 3. Caches Directory
+
+**Purpose**: Temporary data that can be regenerated or re-downloaded
+
+**Path**: `~/Library/Caches/YourApp/`
+
+**Use for**:
+- Downloaded thumbnails
+- Temporary processed data
+- API response caches
+- Compiled assets
+
+**Important**: Cache files may be deleted by the system when disk space is low.
+
+**Example Implementation:**
+
+```python
+from pathlib import Path
+import platform
+import time
+
+def get_caches_dir(app_name: str = "YourApp") -> Path:
+    """
+    Get the Caches directory for your app.
+    Cache files may be deleted by the system when disk space is low.
+    """
+    if platform.system() == "Darwin":  # macOS
+        caches_dir = Path.home() / "Library" / "Caches" / app_name
+        caches_dir.mkdir(parents=True, exist_ok=True)
+        return caches_dir
+    else:
+        # Fallback for Windows/Linux
+        return Path(__file__).parent / "cache"
+
+def cache_file(key: str, data: bytes, app_name: str = "YourApp") -> Path:
+    """Cache data to a file"""
+    cache_dir = get_caches_dir(app_name)
+    cache_file = cache_dir / f"{key}.cache"
+    
+    try:
+        with open(cache_file, 'wb') as f:
+            f.write(data)
+        return cache_file
+    except Exception as e:
+        print(f"Warning: Failed to cache file: {e}")
+        return None
+
+def get_cached_file(key: str, max_age_seconds: int = 3600, 
+                   app_name: str = "YourApp") -> bytes | None:
+    """Get cached data if it exists and is not expired"""
+    cache_dir = get_caches_dir(app_name)
+    cache_file = cache_dir / f"{key}.cache"
+    
+    if not cache_file.exists():
+        return None
+    
+    # Check age
+    age = time.time() - cache_file.stat().st_mtime
+    if age > max_age_seconds:
+        # Cache expired
+        cache_file.unlink()
+        return None
+    
+    try:
+        with open(cache_file, 'rb') as f:
+            return f.read()
+    except Exception as e:
+        print(f"Warning: Failed to read cache: {e}")
+        return None
+
+def clear_cache(app_name: str = "YourApp") -> None:
+    """Clear all cached files"""
+    cache_dir = get_caches_dir(app_name)
+    
+    try:
+        import shutil
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir)
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            print(f"Cache cleared: {cache_dir}")
+    except Exception as e:
+        print(f"Warning: Failed to clear cache: {e}")
+
+# Usage:
+# Cache an API response
+cache_file("api_users", b'{"users": [...]}')
+
+# Get cached data (returns None if expired or missing)
+cached_data = get_cached_file("api_users", max_age_seconds=1800)
+
+# Clear all caches
+clear_cache()
+```
+
+#### 4. Logs Directory
+
+**Purpose**: Application logs, crash reports, debug information
+
+**Path**: `~/Library/Logs/YourApp/`
+
+**Use for**:
+- Application logs
+- Error reports
+- Debug information
+- Performance metrics
+
+**Example Implementation:**
+
+```python
+import logging
+from pathlib import Path
+import platform
+from datetime import datetime
+
+def get_logs_dir(app_name: str = "YourApp") -> Path:
+    """Get the Logs directory for your app"""
+    if platform.system() == "Darwin":  # macOS
+        logs_dir = Path.home() / "Library" / "Logs" / app_name
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        return logs_dir
+    else:
+        # Fallback for Windows/Linux
+        return Path(__file__).parent / "logs"
+
+def setup_logging(app_name: str = "YourApp", level=logging.INFO) -> None:
+    """
+    Set up application logging to both console and file.
+    Logs are saved to ~/Library/Logs/YourApp/
+    """
+    logs_dir = get_logs_dir(app_name)
+    
+    # Create log file with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = logs_dir / f"{app_name}_{timestamp}.log"
+    
+    # Configure logging
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler()  # Also log to console
+        ]
+    )
+    
+    logging.info(f"Logging initialized: {log_file}")
+
+def log_error(error: Exception, app_name: str = "YourApp") -> None:
+    """Log an error with full traceback to log file"""
+    import traceback
+    
+    logs_dir = get_logs_dir(app_name)
+    error_log = logs_dir / "errors.log"
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    error_text = f"\n{'='*60}\n"
+    error_text += f"ERROR at {timestamp}\n"
+    error_text += f"{'='*60}\n"
+    error_text += traceback.format_exc()
+    error_text += f"\n{'='*60}\n"
+    
+    try:
+        with open(error_log, 'a', encoding='utf-8') as f:
+            f.write(error_text)
+        print(f"Error logged to: {error_log}")
+    except Exception as e:
+        print(f"Warning: Failed to log error: {e}")
+
+def cleanup_old_logs(max_age_days: int = 30, app_name: str = "YourApp") -> None:
+    """Remove log files older than specified days"""
+    import time
+    
+    logs_dir = get_logs_dir(app_name)
+    cutoff_time = time.time() - (max_age_days * 86400)
+    
+    for log_file in logs_dir.glob("*.log"):
+        if log_file.stat().st_mtime < cutoff_time:
+            try:
+                log_file.unlink()
+                print(f"Deleted old log: {log_file.name}")
+            except Exception as e:
+                print(f"Warning: Failed to delete log {log_file.name}: {e}")
+
+# Usage:
+setup_logging("YourApp")
+
+try:
+    # Your app code
+    logging.info("Application started")
+    # ...
+except Exception as e:
+    log_error(e)
+    raise
+
+# Periodic cleanup
+cleanup_old_logs(max_age_days=7)
+```
+
+#### 5. Temporary Files
+
+**Purpose**: Very short-lived temporary files
+
+**Path**: `/tmp/` or use `tempfile.mkdtemp()`
+
+**Use for**:
+- Processing temporary files
+- Extraction buffers
+- Build artifacts
+
+**Example:**
+
+```python
+import tempfile
+from pathlib import Path
+
+def get_temp_dir(app_name: str = "YourApp") -> Path:
+    """Get a temporary directory that's cleaned up on reboot"""
+    temp_dir = Path(tempfile.gettempdir()) / app_name
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    return temp_dir
+
+# Or use context manager for automatic cleanup
+with tempfile.TemporaryDirectory(prefix="YourApp_") as temp_dir:
+    temp_path = Path(temp_dir)
+    # Use temp_path...
+    # Automatically deleted when context exits
+```
+
+#### Complete Directory Management Module
+
+Here's a complete module incorporating all directory types:
+
+```python
+"""
+app_paths.py - Centralized path management for macOS applications
+"""
+
+from pathlib import Path
+import platform
+import json
+from typing import Optional
+
+class AppPaths:
+    """Manage all application paths following macOS conventions"""
+    
+    def __init__(self, app_name: str, bundle_id: str):
+        """
+        Initialize path manager.
+        
+        Args:
+            app_name: App name for directories (e.g., "YourApp")
+            bundle_id: Bundle identifier (e.g., "com.yourcompany.yourapp")
+        """
+        self.app_name = app_name
+        self.bundle_id = bundle_id
+        self.is_macos = platform.system() == "Darwin"
+        
+        # Determine if running as frozen app
+        import sys
+        if getattr(sys, 'frozen', False):
+            self.app_dir = Path(sys.executable).resolve().parent
+        else:
+            self.app_dir = Path(__file__).parent.resolve()
+    
+    # Application Support (persistent data)
+    
+    def get_app_support_dir(self) -> Path:
+        """Get ~/Library/Application Support/YourApp/"""
+        if self.is_macos:
+            path = Path.home() / "Library" / "Application Support" / self.app_name
+        else:
+            path = self.app_dir / "data"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    
+    def get_models_dir(self) -> Path:
+        """Get directory for ML models"""
+        path = self.get_app_support_dir() / "models"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    
+    def get_user_data_dir(self) -> Path:
+        """Get directory for user-generated content"""
+        path = self.get_app_support_dir() / "user_data"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    
+    # Preferences (settings)
+    
+    def get_preferences_dir(self) -> Path:
+        """Get ~/Library/Preferences/com.yourcompany.yourapp/"""
+        if self.is_macos:
+            path = Path.home() / "Library" / "Preferences" / self.bundle_id
+        else:
+            path = self.app_dir
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    
+    def get_config_file(self) -> Path:
+        """Get path to main config file"""
+        return self.get_preferences_dir() / "config.json"
+    
+    def load_config(self) -> dict:
+        """Load configuration from file"""
+        config_file = self.get_config_file()
+        if config_file.exists():
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Warning: Failed to load config: {e}")
+        return {}
+    
+    def save_config(self, config: dict) -> None:
+        """Save configuration to file"""
+        config_file = self.get_config_file()
+        try:
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+        except Exception as e:
+            print(f"Warning: Failed to save config: {e}")
+    
+    # Caches (temporary data)
+    
+    def get_caches_dir(self) -> Path:
+        """Get ~/Library/Caches/YourApp/"""
+        if self.is_macos:
+            path = Path.home() / "Library" / "Caches" / self.app_name
+        else:
+            path = self.app_dir / "cache"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    
+    # Logs (application logs)
+    
+    def get_logs_dir(self) -> Path:
+        """Get ~/Library/Logs/YourApp/"""
+        if self.is_macos:
+            path = Path.home() / "Library" / "Logs" / self.app_name
+        else:
+            path = self.app_dir / "logs"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+# Global instance (initialize once at app startup)
+paths = AppPaths(app_name="YourApp", bundle_id="com.yourcompany.yourapp")
+
+# Usage throughout your app:
+# from app_paths import paths
+#
+# model_file = paths.get_models_dir() / "model.bin"
+# config = paths.load_config()
+# log_file = paths.get_logs_dir() / "app.log"
+```
+
+#### Best Practices
+
+**1. Always Create Directories with `mkdir(parents=True, exist_ok=True)`**
+
+```python
+path = Path.home() / "Library" / "Application Support" / "YourApp"
+path.mkdir(parents=True, exist_ok=True)  # Safe, won't fail if exists
+```
+
+**2. Use Platform Detection**
+
+```python
+import platform
+
+if platform.system() == "Darwin":  # macOS
+    # Use ~/Library/...
+else:
+    # Fallback for other platforms
+```
+
+**3. Handle Errors Gracefully**
+
+```python
+try:
+    with open(config_file, 'r') as f:
+        config = json.load(f)
+except Exception as e:
+    print(f"Warning: Using default config due to: {e}")
+    config = get_default_config()
+```
+
+**4. Don't Store Large Files in Preferences**
+
+- ✅ Application Support: Models, databases, user content
+- ❌ Preferences: Should only be small config files
+
+**5. Respect Privacy**
+
+Don't access directories outside your app's sandbox without user permission:
+- Use file dialogs for user-selected files
+- Don't scan or index user's home directory
+- Respect privacy entitlements
+
+**6. Clean Up on Uninstall**
+
+Provide a way to remove all app data:
+
+```python
+def uninstall_cleanup(app_name: str, bundle_id: str):
+    """Remove all app data (call before uninstalling)"""
+    import shutil
+    
+    dirs_to_remove = [
+        Path.home() / "Library" / "Application Support" / app_name,
+        Path.home() / "Library" / "Caches" / app_name,
+        Path.home() / "Library" / "Logs" / app_name,
+        Path.home() / "Library" / "Preferences" / bundle_id,
+    ]
+    
+    for directory in dirs_to_remove:
+        if directory.exists():
+            try:
+                shutil.rmtree(directory)
+                print(f"Removed: {directory}")
+            except Exception as e:
+                print(f"Warning: Could not remove {directory}: {e}")
+```
+
+#### Summary Table
+
+| Directory | Path | Purpose | Backed Up | Can Be Deleted |
+|-----------|------|---------|-----------|----------------|
+| Application Support | `~/Library/Application Support/YourApp/` | Models, databases, user data | ✅ Yes | ❌ No |
+| Preferences | `~/Library/Preferences/com.yourcompany.yourapp/` | Settings, config | ✅ Yes | ❌ No |
+| Caches | `~/Library/Caches/YourApp/` | Temporary cached data | ❌ No | ✅ Yes (by system) |
+| Logs | `~/Library/Logs/YourApp/` | Application logs | ❌ No | ✅ Yes (manually) |
+| Temp | `/tmp/YourApp_*` | Very short-lived files | ❌ No | ✅ Yes (on reboot) |
+
 ### PyWebView Integration
 
 PyWebView creates **native macOS windows** that display your web application without requiring an external browser. This provides a true native app experience with proper window management, dock integration, and system integration.
