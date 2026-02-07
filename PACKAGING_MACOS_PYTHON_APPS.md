@@ -660,6 +660,345 @@ if [ -d "ui" ] && [ -f "scripts/build_ui.sh" ]; then
 fi
 ```
 
+#### Complete Local Release Build Script
+
+For testing the full release build process locally (including DMG/ZIP creation), create a script that replicates the GitHub Actions workflow:
+
+**`build_release_local.sh`**:
+
+```bash
+#!/bin/bash
+# ---------------------------------------------------------------------------
+#  Complete Local Release Build Script
+#  Replicates the GitHub Actions build-release.yml workflow locally
+#  Creates .app bundle, DMG, and ZIP for distribution testing
+# ---------------------------------------------------------------------------
+
+set -e  # Exit on error
+
+echo "=========================================="
+echo "Local Release Build"
+echo "=========================================="
+echo ""
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Configuration
+APP_NAME="YourApp"
+VERSION="${VERSION:-$(cat VERSION 2>/dev/null || echo '1.0.0-local')}"
+PYTHON_VERSION="3.11"
+
+echo "App: $APP_NAME"
+echo "Version: $VERSION"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 1. Set up Python environment
+# ---------------------------------------------------------------------------
+echo "=== Step 1: Python Environment ==="
+
+PYTHON_CMD=""
+if command -v python${PYTHON_VERSION} &> /dev/null; then
+    PYTHON_CMD="python${PYTHON_VERSION}"
+elif command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+else
+    echo "ERROR: Python 3 not found"
+    exit 1
+fi
+
+echo "Using: $($PYTHON_CMD --version)"
+
+# Create/activate virtual environment
+VENV_DIR="${SCRIPT_DIR}/venv_release"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating virtual environment..."
+    $PYTHON_CMD -m venv "$VENV_DIR"
+fi
+
+source "${VENV_DIR}/bin/activate"
+PY="${VENV_DIR}/bin/python"
+
+echo "✓ Python environment ready"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 2. Build UI (if present)
+# ---------------------------------------------------------------------------
+echo "=== Step 2: Build UI ==="
+
+if [ -f "ui/package.json" ]; then
+    if command -v bun &> /dev/null; then
+        echo "Building UI with Bun..."
+        ./scripts/build_ui.sh
+    else
+        echo "WARNING: Bun not found, skipping UI build"
+        echo "Install from: https://bun.sh"
+    fi
+else
+    echo "No UI to build"
+fi
+
+echo "✓ UI build complete"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 3. Install Dependencies
+# ---------------------------------------------------------------------------
+echo "=== Step 3: Install Dependencies ==="
+
+"$PY" -m pip install --upgrade pip --quiet
+echo "Installing base requirements..."
+"$PY" -m pip install -r requirements.txt --quiet
+
+# Install additional dependencies (adjust for your project)
+echo "Installing additional dependencies..."
+"$PY" -m pip install "pyinstaller>=6.0" --quiet
+
+# Optional: Install app-specific dependencies
+# "$PY" -m pip install "audio-separator==0.40.0" --no-deps --quiet
+# "$PY" -m pip install "TTS==0.21.2" --quiet
+
+echo "✓ Dependencies installed"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 4. Verify Build Assets
+# ---------------------------------------------------------------------------
+echo "=== Step 4: Verify Build Assets ==="
+
+if [ ! -f "build/macos/${APP_NAME}.icns" ]; then
+    echo "ERROR: build/macos/${APP_NAME}.icns not found"
+    exit 1
+fi
+
+if [ ! -f "build/macos/codesign.sh" ]; then
+    echo "ERROR: build/macos/codesign.sh not found"
+    exit 1
+fi
+
+echo "✓ Build assets verified"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 5. Clean Previous Builds
+# ---------------------------------------------------------------------------
+echo "=== Step 5: Clean Previous Builds ==="
+
+rm -rf "dist/${APP_NAME}.app" "dist/${APP_NAME}" "build/${APP_NAME}"
+rm -f "${APP_NAME}-macOS.dmg" "${APP_NAME}-macOS.zip" checksums.txt
+
+echo "✓ Previous builds cleaned"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 6. Build with PyInstaller
+# ---------------------------------------------------------------------------
+echo "=== Step 6: Build with PyInstaller ==="
+
+"$PY" -m PyInstaller "${APP_NAME}.spec" --clean --noconfirm
+
+# Verify build succeeded
+BUNDLED_APP="dist/${APP_NAME}.app"
+BUNDLED_BIN="${BUNDLED_APP}/Contents/MacOS/${APP_NAME}_bin"
+
+if [ ! -f "$BUNDLED_BIN" ]; then
+    echo "ERROR: Build failed - binary not found at: $BUNDLED_BIN"
+    exit 1
+fi
+
+echo "✓ PyInstaller build complete"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 7. Set Up App Bundle Executable
+# ---------------------------------------------------------------------------
+echo "=== Step 7: Set Up App Bundle ==="
+
+# Copy binary to expected location (CFBundleExecutable name)
+cp "${BUNDLED_BIN}" "${BUNDLED_APP}/Contents/MacOS/${APP_NAME}"
+chmod +x "${BUNDLED_APP}/Contents/MacOS/${APP_NAME}"
+
+echo "✓ App bundle configured"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 8. Code Sign the App
+# ---------------------------------------------------------------------------
+echo "=== Step 8: Code Sign App Bundle ==="
+
+chmod +x build/macos/codesign.sh
+
+# Use ad-hoc signing by default (no certificate required)
+# Set MACOS_SIGNING_IDENTITY environment variable for Developer ID
+export MACOS_SIGNING_IDENTITY="${MACOS_SIGNING_IDENTITY:--}"
+
+./build/macos/codesign.sh "$BUNDLED_APP"
+
+# Remove quarantine attributes
+xattr -cr "$BUNDLED_APP" 2>/dev/null || true
+
+echo "✓ Code signing complete"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 9. Create DMG (Disk Image)
+# ---------------------------------------------------------------------------
+echo "=== Step 9: Create DMG ==="
+
+DMG_TEMP="dmg_temp"
+DMG_NAME="${APP_NAME}-${VERSION}-macOS.dmg"
+
+# Clean and create temp directory
+rm -rf "$DMG_TEMP"
+mkdir -p "$DMG_TEMP"
+
+# Copy app to DMG temp
+cp -R "$BUNDLED_APP" "$DMG_TEMP/"
+
+# Optional: Copy launcher script if it exists
+if [ -f "${APP_NAME}.command" ]; then
+    cp "${APP_NAME}.command" "$DMG_TEMP/"
+    chmod +x "$DMG_TEMP/${APP_NAME}.command"
+fi
+
+# Create Applications symlink
+ln -s /Applications "$DMG_TEMP/Applications"
+
+# Create README
+cat > "$DMG_TEMP/README.txt" << EOF
+${APP_NAME} - macOS Edition
+==========================
+
+Installation:
+1. Drag ${APP_NAME}.app to your Applications folder
+2. Double-click to launch
+3. On first launch, you may need to right-click → Open
+
+Version: ${VERSION}
+
+For more information, visit:
+https://github.com/yourcompany/yourapp
+EOF
+
+# Create DMG
+echo "Creating DMG: $DMG_NAME"
+hdiutil create \
+    -volname "$APP_NAME" \
+    -srcfolder "$DMG_TEMP" \
+    -ov \
+    -format UDZO \
+    "$DMG_NAME"
+
+# Clean up temp directory
+rm -rf "$DMG_TEMP"
+
+echo "✓ DMG created: $DMG_NAME"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 10. Create ZIP Archive
+# ---------------------------------------------------------------------------
+echo "=== Step 10: Create ZIP Archive ==="
+
+ZIP_NAME="${APP_NAME}-${VERSION}-macOS.zip"
+
+cd dist
+zip -r "../$ZIP_NAME" "${APP_NAME}.app" --quiet
+cd ..
+
+echo "✓ ZIP created: $ZIP_NAME"
+echo ""
+
+# ---------------------------------------------------------------------------
+# 11. Calculate Checksums
+# ---------------------------------------------------------------------------
+echo "=== Step 11: Calculate Checksums ==="
+
+shasum -a 256 "$DMG_NAME" > checksums.txt
+shasum -a 256 "$ZIP_NAME" >> checksums.txt
+
+echo "Checksums:"
+cat checksums.txt
+
+echo ""
+echo "✓ Checksums calculated"
+echo ""
+
+# ---------------------------------------------------------------------------
+# Build Complete
+# ---------------------------------------------------------------------------
+echo "=========================================="
+echo "✓ Release Build Complete!"
+echo "=========================================="
+echo ""
+echo "Artifacts created:"
+echo "  • App Bundle: $BUNDLED_APP"
+echo "  • DMG:        $DMG_NAME"
+echo "  • ZIP:        $ZIP_NAME"
+echo "  • Checksums:  checksums.txt"
+echo ""
+echo "Size information:"
+ls -lh "$DMG_NAME" "$ZIP_NAME" | awk '{print "  " $9 ": " $5}'
+echo ""
+echo "To test the DMG:"
+echo "  1. Open: $DMG_NAME"
+echo "  2. Drag ${APP_NAME}.app to Applications"
+echo "  3. Launch from Applications folder"
+echo ""
+echo "To test the app directly:"
+echo "  open \"$BUNDLED_APP\""
+echo ""
+```
+
+Make it executable:
+
+```bash
+chmod +x build_release_local.sh
+```
+
+**Usage:**
+
+```bash
+# Basic build
+./build_release_local.sh
+
+# With custom version
+VERSION="v1.2.3" ./build_release_local.sh
+
+# With Developer ID signing (requires certificate)
+MACOS_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAM123)" \
+    ./build_release_local.sh
+```
+
+**What This Script Does:**
+
+This script replicates the complete GitHub Actions workflow locally:
+
+1. ✅ Sets up Python environment with venv
+2. ✅ Builds web UI (if present)
+3. ✅ Installs all dependencies
+4. ✅ Verifies build assets (icon, codesign script)
+5. ✅ Cleans previous builds
+6. ✅ Builds app with PyInstaller
+7. ✅ Sets up app bundle executable
+8. ✅ Code signs the app bundle
+9. ✅ Creates DMG disk image with Applications symlink
+10. ✅ Creates ZIP archive
+11. ✅ Calculates SHA256 checksums
+
+**Output:**
+
+After running, you'll have:
+- `dist/YourApp.app` - The application bundle
+- `YourApp-1.0.0-macOS.dmg` - DMG for distribution
+- `YourApp-1.0.0-macOS.zip` - ZIP for distribution
+- `checksums.txt` - SHA256 checksums
+
+This allows you to test the complete release process locally before pushing changes that trigger CI/CD.
+
 ---
 
 ### Step 6: Code Signing
