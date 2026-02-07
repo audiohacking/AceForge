@@ -1060,66 +1060,485 @@ def download_model_if_needed(model_name, url):
 
 ### PyWebView Integration
 
-For native window UI with web technologies:
+PyWebView creates **native macOS windows** that display your web application without requiring an external browser. This provides a true native app experience with proper window management, dock integration, and system integration.
 
-**Flask + PyWebView Setup:**
+#### Complete Flask + PyWebView Integration
+
+This section covers the complete implementation including server startup, window lifecycle management, and proper cleanup on window close.
+
+**Production-Ready Implementation:**
 
 ```python
-import webview
-from flask import Flask
+#!/usr/bin/env python3
+"""
+Complete PyWebView + Flask integration with proper lifecycle management
+"""
+
+import sys
+import os
 import threading
 import time
+import socket
+import atexit
+from pathlib import Path
+
+import webview
+from flask import Flask
+from waitress import serve
+
+# Server configuration
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = 5000
+SERVER_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+
+# Application state
+_shutting_down = False
 
 def create_app():
+    """Create and configure Flask application"""
     app = Flask(__name__)
     
     @app.route('/')
     def index():
         return """
+        <!DOCTYPE html>
         <html>
-            <head><title>YourApp</title></head>
+            <head>
+                <title>YourApp</title>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+            </head>
             <body>
                 <h1>Hello from PyWebView!</h1>
+                <p>This is a native macOS window displaying web content.</p>
+                <button onclick="window.pywebview.api.test()">Test API</button>
             </body>
         </html>
         """
     
     return app
 
-def start_server(app, port=5000):
-    """Start Flask server in background thread"""
-    app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)
+def wait_for_server(host, port, max_wait=30):
+    """Wait for Flask server to be ready"""
+    print(f"Waiting for server at {host}:{port}...", flush=True)
+    waited = 0
+    while waited < max_wait:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex((host, port))
+            sock.close()
+            if result == 0:
+                print(f"Server ready at http://{host}:{port}", flush=True)
+                return True
+        except Exception:
+            pass
+        time.sleep(0.5)
+        waited += 0.5
+    return False
+
+def start_flask_server(app, host, port):
+    """Start Flask server using Waitress (production WSGI server)"""
+    print(f"Starting Flask server on {host}:{port}...", flush=True)
+    try:
+        # Use Waitress instead of Flask's development server
+        serve(app, host=host, port=port, threads=4, channel_timeout=120)
+    except Exception as e:
+        print(f"Flask server error: {e}", flush=True)
+        raise
+
+def cleanup_resources():
+    """Clean up all resources before shutdown"""
+    global _shutting_down
+    
+    if _shutting_down:
+        return  # Already cleaning up
+    
+    _shutting_down = True
+    print("Cleaning up resources...", flush=True)
+    
+    try:
+        # Clean up your app-specific resources here
+        # Examples:
+        # - Release ML models
+        # - Close database connections
+        # - Clear caches
+        # - Save state
+        
+        # For PyTorch apps:
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                torch.mps.empty_cache()
+        except ImportError:
+            pass
+        
+        # Force garbage collection
+        import gc
+        gc.collect()
+        
+        print("Resource cleanup completed", flush=True)
+        
+    except Exception as e:
+        print(f"Warning: Error during cleanup: {e}", flush=True)
+
+class WindowAPI:
+    """
+    API exposed to JavaScript for window control.
+    Methods can be called from JavaScript using: window.pywebview.api.method_name()
+    """
+    
+    def test(self):
+        """Test API method"""
+        print("API test method called from JavaScript!", flush=True)
+        return {"status": "ok", "message": "API is working!"}
+    
+    def minimize(self):
+        """Minimize the window"""
+        try:
+            if webview.windows:
+                webview.windows[0].minimize()
+                return {"status": "ok"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    
+    def maximize(self):
+        """Maximize the window"""
+        try:
+            if webview.windows:
+                webview.windows[0].maximize()
+                return {"status": "ok"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
 def main():
+    """Main entry point with proper lifecycle management"""
+    global _shutting_down
+    
+    # Create Flask app
     app = create_app()
     
-    # Start Flask in daemon thread
+    # Start Flask server in background daemon thread
     server_thread = threading.Thread(
-        target=lambda: start_server(app, 5000),
-        daemon=True
+        target=start_flask_server,
+        args=(app, SERVER_HOST, SERVER_PORT),
+        daemon=True,
+        name="FlaskServer"
     )
     server_thread.start()
     
-    # Wait for server to start
-    time.sleep(1)
+    # Wait for server to be ready
+    if not wait_for_server(SERVER_HOST, SERVER_PORT):
+        print("ERROR: Server failed to start in time", flush=True)
+        sys.exit(1)
     
-    # Create native window
+    # Create API instance
+    window_api = WindowAPI()
+    
+    # Define window close handler
+    def on_window_closed():
+        """
+        Called when user closes the window (clicks X button).
+        This is where you perform cleanup and shutdown.
+        """
+        print("Window closed by user", flush=True)
+        
+        # Clean up all resources
+        cleanup_resources()
+        
+        # Exit the application
+        # Use os._exit(0) to bypass any cleanup handlers that might cause issues
+        os._exit(0)
+    
+    # Create native macOS window
     window = webview.create_window(
-        'YourApp',
-        'http://127.0.0.1:5000',
+        title="YourApp",
+        url=SERVER_URL,
         width=1200,
         height=800,
+        min_size=(800, 600),  # Minimum window size
         resizable=True,
-        frameless=False,
-        easy_drag=True,
+        fullscreen=False,
+        frameless=False,  # Set to True for frameless window
+        easy_drag=True,  # Allow dragging frameless window
+        on_top=False,
+        shadow=True,
+        js_api=window_api,  # Expose API to JavaScript
     )
     
-    # Start webview (blocks until window closes)
-    webview.start()
+    # Register window close event handler
+    # CRITICAL: This ensures proper cleanup when user closes the window
+    try:
+        window.events.closed += on_window_closed
+        print("Window close handler registered", flush=True)
+    except Exception as e:
+        print(f"Warning: Could not register close handler: {e}", flush=True)
+        # Fallback: register cleanup with atexit
+        atexit.register(cleanup_resources)
+    
+    # Register backup cleanup handler
+    atexit.register(cleanup_resources)
+    
+    # Start the GUI event loop (blocking call)
+    # This will run until the window is closed
+    print("Starting GUI event loop...", flush=True)
+    webview.start(debug=False)
+    
+    # This line is reached after window closes
+    # (if on_window_closed doesn't call os._exit)
+    print("GUI event loop ended", flush=True)
+    cleanup_resources()
+    sys.exit(0)
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nInterrupted by user", flush=True)
+        cleanup_resources()
+        sys.exit(0)
+    except Exception as e:
+        import traceback
+        print(f"FATAL ERROR:\n{traceback.format_exc()}", flush=True)
+        cleanup_resources()
+        sys.exit(1)
 ```
+
+#### Key Components Explained
+
+**1. Window Close Handler (`on_window_closed`)**
+
+The window close handler is **critical** for proper application shutdown. When the user clicks the X button:
+
+```python
+def on_window_closed():
+    """Handle window close event"""
+    print("Window closed by user", flush=True)
+    cleanup_resources()  # Clean up before exit
+    os._exit(0)  # Immediate exit
+```
+
+Register it with:
+```python
+window.events.closed += on_window_closed
+```
+
+**Why `os._exit(0)` instead of `sys.exit(0)`?**
+- `os._exit(0)` exits immediately without running cleanup handlers
+- Prevents any code from running that might try to re-initialize the window
+- Essential for frozen PyInstaller apps where cleanup handlers can cause issues
+
+**2. Resource Cleanup**
+
+The `cleanup_resources()` function should release all app resources:
+
+```python
+def cleanup_resources():
+    """Clean up before shutdown"""
+    global _shutting_down
+    
+    if _shutting_down:
+        return  # Prevent duplicate cleanup
+    
+    _shutting_down = True
+    
+    # Release ML models, clear GPU cache, etc.
+    try:
+        import torch
+        if hasattr(torch.backends, "mps"):
+            torch.mps.empty_cache()
+    except:
+        pass
+    
+    # Force garbage collection
+    import gc
+    gc.collect()
+```
+
+**3. Server Readiness Check**
+
+Never create the window before the server is ready:
+
+```python
+def wait_for_server(host, port, max_wait=30):
+    """Wait for server to accept connections"""
+    waited = 0
+    while waited < max_wait:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex((host, port))
+            sock.close()
+            if result == 0:
+                return True
+        except:
+            pass
+        time.sleep(0.5)
+        waited += 0.5
+    return False
+```
+
+**4. Production WSGI Server**
+
+Use Waitress instead of Flask's development server:
+
+```python
+from waitress import serve
+
+def start_flask_server(app, host, port):
+    """Production-ready server"""
+    serve(app, host=host, port=port, threads=4, channel_timeout=120)
+```
+
+**5. JavaScript API Bridge**
+
+Expose Python functions to JavaScript:
+
+```python
+class WindowAPI:
+    def my_function(self, arg1, arg2):
+        """Callable from JavaScript"""
+        return {"result": "success"}
+
+# JavaScript side:
+# window.pywebview.api.my_function(arg1, arg2).then(result => {
+#     console.log(result);
+# });
+```
+
+#### Advanced Window Features
+
+**Window Configuration Options:**
+
+```python
+window = webview.create_window(
+    title="App Title",
+    url="http://127.0.0.1:5000",
+    
+    # Size and position
+    width=1400,
+    height=900,
+    x=100,  # Position from left edge
+    y=100,  # Position from top edge
+    min_size=(800, 600),  # Minimum dimensions
+    
+    # Appearance
+    resizable=True,
+    fullscreen=False,
+    frameless=False,  # Remove title bar and borders
+    easy_drag=True,  # Drag frameless window by any area
+    on_top=False,  # Always on top of other windows
+    shadow=True,  # Drop shadow (for frameless windows)
+    
+    # Behavior
+    confirm_close=False,  # Ask before closing
+    background_color='#FFFFFF',  # Window background
+    text_select=True,  # Allow text selection
+    
+    # API
+    js_api=window_api,  # Expose Python API to JavaScript
+)
+```
+
+**Running JavaScript from Python:**
+
+```python
+# After window is created and loaded
+def run_after_load():
+    time.sleep(1)  # Wait for page load
+    result = window.evaluate_js('document.title')
+    print(f"Page title: {result}")
+    
+    # Or use run_js() to execute without return value
+    window.run_js('document.body.style.background = "blue"')
+
+# Run in separate thread
+threading.Thread(target=run_after_load, daemon=True).start()
+```
+
+**Frameless Window with Custom Title Bar:**
+
+```python
+# Create frameless window
+window = webview.create_window(
+    title="YourApp",
+    url=SERVER_URL,
+    frameless=True,
+    easy_drag=True,
+)
+
+# HTML with custom title bar
+html = """
+<div id="titlebar" style="
+    -webkit-app-region: drag;
+    height: 40px;
+    background: #333;
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+">
+    <span>YourApp</span>
+    <div style="margin-left: auto; -webkit-app-region: no-drag;">
+        <button onclick="window.pywebview.api.minimize()">−</button>
+        <button onclick="window.pywebview.api.maximize()">□</button>
+        <button onclick="window.close()">×</button>
+    </div>
+</div>
+"""
+```
+
+#### Singleton Protection for PyInstaller
+
+For PyInstaller frozen apps, protect against duplicate window creation:
+
+```python
+import threading
+
+_webview_started = False
+_webview_lock = threading.Lock()
+
+def safe_webview_start(*args, **kwargs):
+    """Prevent duplicate webview.start() calls"""
+    global _webview_started
+    with _webview_lock:
+        if _webview_started:
+            return None
+        _webview_started = True
+        return webview.start(*args, **kwargs)
+
+# Use instead of webview.start()
+safe_webview_start()
+```
+
+#### Troubleshooting PyWebView
+
+**Window doesn't close properly:**
+- Ensure `on_window_closed` handler is registered
+- Use `os._exit(0)` instead of `sys.exit(0)`
+- Check for background threads preventing exit
+
+**"Server not ready" errors:**
+- Increase `max_wait` in `wait_for_server()`
+- Check firewall/port availability
+- Verify Flask server starts without errors
+
+**JavaScript API not working:**
+- Ensure `js_api` parameter is set in `create_window()`
+- Wait for page to load before calling API
+- Check browser console for JavaScript errors
+
+**Window shows blank page:**
+- Verify server is running and accessible
+- Check Flask route returns valid HTML
+- Test URL in regular browser first
+
+**App doesn't terminate on close:**
+- Verify close handler is registered
+- Check for non-daemon threads keeping process alive
+- Use `os._exit(0)` for immediate termination
 
 ### Multi-Architecture Support
 
