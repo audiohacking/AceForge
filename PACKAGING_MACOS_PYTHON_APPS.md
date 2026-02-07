@@ -2744,6 +2744,503 @@ GitHub Actions can build both using different runners.
   - AI/ML dependencies (PyTorch, transformers, etc.)
   - CI/CD with GitHub Actions
 
+---
+
+## Real-World Implementation: AceForge
+
+This section provides the **actual, complete scripts** from the AceForge project as a concrete example. These are production scripts, not templates.
+
+### AceForge build_local.sh (Complete)
+
+The actual AceForge local build script with all optimizations and caching features:
+
+```bash
+#!/bin/bash
+# ---------------------------------------------------------------------------
+#  AceForge - Local Build Script
+#  Builds the PyInstaller app bundle for local testing.
+#  Includes the new React UI (ui/) when present; requires Bun (https://bun.sh).
+#
+#  Optional env vars (safe, non-destructive caching for faster rebuilds):
+#    ACEFORGE_QUICK_BUILD=1  - Reuse PyInstaller cache (omit --clean, keep build/AceForge).
+#                              Use when only code changed; full clean build if things break.
+#    ACEFORGE_SKIP_UI_BUILD=1 - Skip UI build; use existing ui/dist/. Use when only Python changed.
+#    ACEFORGE_SKIP_PIP=1     - Skip venv/pip steps. Use when deps unchanged and venv already ready.
+# ---------------------------------------------------------------------------
+
+set -e  # Exit on error
+
+echo "=========================================="
+echo "AceForge - Local Build"
+echo "=========================================="
+echo ""
+
+# App root = folder this script lives in
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$APP_DIR"
+
+# ---------------------------------------------------------------------------
+# Build new UI (React/Vite) with Bun when ui/ exists; skip if ACEFORGE_SKIP_UI_BUILD=1.
+# ---------------------------------------------------------------------------
+UI_DIR="${APP_DIR}/ui"
+if [ -f "$UI_DIR/package.json" ]; then
+    if [ -n "${ACEFORGE_SKIP_UI_BUILD}" ]; then
+        if [ ! -f "$UI_DIR/dist/index.html" ]; then
+            echo "ERROR: ACEFORGE_SKIP_UI_BUILD is set but ui/dist/index.html not found. Run without it once."
+            exit 1
+        fi
+        echo "[Build] Skipping UI build (ACEFORGE_SKIP_UI_BUILD)"
+    else
+        if ! command -v bun &> /dev/null; then
+            echo "ERROR: Bun is required to build the new UI. Install from https://bun.sh"
+            exit 1
+        fi
+        echo "[Build] Building new UI (React SPA) with Bun..."
+        "${APP_DIR}/scripts/build_ui.sh"
+        echo "[Build] New UI build OK"
+    fi
+else
+    echo "ERROR: ui/package.json not found. The new UI source is required for the full app build."
+    exit 1
+fi
+echo ""
+
+# Check Python version
+PYTHON_CMD=""
+if command -v python3.11 &> /dev/null; then
+    PYTHON_CMD="python3.11"
+elif command -v python3 &> /dev/null; then
+    PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
+    if [[ "$PYTHON_VERSION" == "3.11" ]]; then
+        PYTHON_CMD="python3"
+    else
+        echo "WARNING: python3 is version $PYTHON_VERSION, but 3.11 is recommended"
+        read -p "Continue anyway? (y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+        PYTHON_CMD="python3"
+    fi
+else
+    echo "ERROR: Python 3.11 not found. Please install Python 3.11."
+    exit 1
+fi
+
+echo "[Build] Using Python: $($PYTHON_CMD --version)"
+echo ""
+
+# Virtual environment
+VENV_DIR="${APP_DIR}/venv_build"
+VENV_PY="${VENV_DIR}/bin/python"
+
+# Create/activate virtual environment
+if [ ! -f "$VENV_PY" ]; then
+    if [ -n "${ACEFORGE_SKIP_PIP}" ]; then
+        echo "ERROR: ACEFORGE_SKIP_PIP is set but venv_build not found. Run without it once."
+        exit 1
+    fi
+    echo "[Build] Creating virtual environment..."
+    $PYTHON_CMD -m venv "$VENV_DIR"
+fi
+
+echo "[Build] Activating virtual environment..."
+source "${VENV_DIR}/bin/activate"
+
+# Use venv Python for all installs and PyInstaller (ensures TTS and deps are in the bundle)
+PY="${VENV_PY}"
+
+if [ -z "${ACEFORGE_SKIP_PIP}" ]; then
+# Upgrade pip
+echo "[Build] Upgrading pip..."
+"$PY" -m pip install --upgrade pip --quiet
+
+# Install dependencies
+echo "[Build] Installing dependencies..."
+"$PY" -m pip install -r requirements_ace_macos.txt --quiet
+
+# Install additional dependencies
+echo "[Build] Installing additional dependencies..."
+"$PY" -m pip install "audio-separator==0.40.0" --no-deps --quiet
+"$PY" -m pip install "py3langid==0.3.0" --no-deps --quiet
+"$PY" -m pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps --quiet
+"$PY" -m pip install "rotary_embedding_torch" --quiet
+
+# ---------------------------------------------------------------------------
+# Slimming: remove Japanese (Sudachi) dictionary payload
+# SudachiDict-core is ~200MB and not needed for AceForge.
+# We explicitly uninstall it (and SudachiPy) so PyInstaller cannot bundle it.
+# ---------------------------------------------------------------------------
+echo "[Build] Removing Japanese Sudachi packages (if present)..."
+"$PY" -m pip uninstall -y SudachiDict-core SudachiPy sudachidict-core sudachipy >/dev/null 2>&1 || true
+
+# Install TTS for voice cloning (required for frozen app; build fails if TTS cannot be imported)
+# TTS 0.21.2 needs its full dependency tree (phonemizers etc.); --no-deps breaks "from TTS.api import TTS"
+echo "[Build] Installing TTS for voice cloning..."
+"$PY" -m pip install "coqpit" "trainer>=0.0.32" "pysbd>=0.3.4" "inflect>=5.6.0" "unidecode>=1.3.2" --quiet
+"$PY" -m pip install "TTS==0.21.2" --quiet
+if ! "$PY" -c "from TTS.api import TTS" 2>/dev/null; then
+    echo "[Build] ERROR: TTS installed but 'from TTS.api import TTS' failed. Voice cloning will not work in the app."
+    echo "[Build] Run: $PY -c \"from TTS.api import TTS\" to see the error."
+    "$PY" -c "from TTS.api import TTS" || true
+    exit 1
+fi
+echo "[Build] TTS verified: from TTS.api import TTS OK"
+
+# Install Demucs for stem splitting (optional component)
+echo "[Build] Installing Demucs for stem splitting..."
+"$PY" -m pip install "demucs==4.0.1" --quiet
+if ! "$PY" -c "import demucs.separate" 2>/dev/null; then
+    echo "[Build] WARNING: Demucs installed but 'import demucs.separate' failed. Stem splitting will not work in the app."
+    echo "[Build] Run: $PY -c \"import demucs.separate\" to see the error."
+    "$PY" -c "import demucs.separate" || true
+    # Don't exit - stem splitting is optional
+else
+    echo "[Build] Demucs verified: import demucs.separate OK"
+fi
+
+# Install basic-pitch for MIDI generation (optional component)
+echo "[Build] Installing basic-pitch for MIDI generation..."
+"$PY" -m pip install "basic-pitch>=0.4.0" --quiet
+if ! "$PY" -c "from basic_pitch.inference import predict" 2>/dev/null; then
+    echo "[Build] WARNING: basic-pitch installed but 'from basic_pitch.inference import predict' failed. MIDI generation will not work in the app."
+    echo "[Build] Run: $PY -c \"from basic_pitch.inference import predict\" to see the error."
+    "$PY" -c "from basic_pitch.inference import predict" || true
+    # Don't exit - MIDI generation is optional
+else
+    echo "[Build] basic-pitch verified: from basic_pitch.inference import predict OK"
+fi
+
+"$PY" -m pip install "pyinstaller>=6.0" --quiet
+
+# One last pass right before bundling, in case anything reintroduced Sudachi.
+echo "[Build] Final check: removing Japanese Sudachi packages (if present)..."
+"$PY" -m pip uninstall -y SudachiDict-core SudachiPy sudachidict-core sudachipy >/dev/null 2>&1 || true
+else
+    echo "[Build] Skipping pip steps (ACEFORGE_SKIP_PIP)"
+fi
+
+# Check for PyInstaller (always run)
+if ! "$PY" -m PyInstaller --version &> /dev/null; then
+    echo "ERROR: PyInstaller not found. Please install it:"
+    echo "  $PY -m pip install pyinstaller"
+    exit 1
+fi
+
+echo "[Build] PyInstaller version: $("$PY" -m PyInstaller --version)"
+echo ""
+
+# Clean previous builds (PyInstaller outputs only).
+# NEVER delete build/macos/ — it contains AceForge.icns (app icon), codesign.sh, pyinstaller hooks.
+# NEVER delete ui/dist/ — may have been produced by the new UI build above.
+# ACEFORGE_QUICK_BUILD=1: keep build/AceForge so PyInstaller can reuse cache.
+if [ -n "${ACEFORGE_QUICK_BUILD}" ]; then
+    echo "[Build] Quick build: reusing PyInstaller cache (keeping build/AceForge)"
+    rm -rf dist/AceForge.app dist/CDMF
+else
+    echo "[Build] Cleaning previous PyInstaller builds..."
+    rm -rf dist/AceForge.app dist/CDMF build/AceForge
+fi
+
+# Safeguard: build/macos must exist for the app icon and code signing
+if [ ! -f "build/macos/AceForge.icns" ]; then
+    echo "ERROR: build/macos/AceForge.icns not found. build/macos/ must never be deleted."
+    echo "  Restore from main: git checkout main -- build/macos/"
+    exit 1
+fi
+
+# Build with PyInstaller (omit --clean when ACEFORGE_QUICK_BUILD=1 to reuse cache)
+echo "[Build] Building app bundle with PyInstaller..."
+echo "This may take several minutes..."
+if [ -n "${ACEFORGE_QUICK_BUILD}" ]; then
+    "$PY" -m PyInstaller CDMF.spec --noconfirm
+else
+    "$PY" -m PyInstaller CDMF.spec --clean --noconfirm
+fi
+
+# Check if build succeeded
+BUNDLED_APP="${APP_DIR}/dist/AceForge.app"
+BUNDLED_BIN="${BUNDLED_APP}/Contents/MacOS/AceForge_bin"
+
+if [ ! -f "$BUNDLED_BIN" ]; then
+    echo ""
+    echo "ERROR: Build failed - binary not found at: $BUNDLED_BIN"
+    exit 1
+fi
+
+# For serverless pywebview app, we don't need launcher scripts
+# The binary (AceForge_bin) should be the main executable
+# Rename it to AceForge for cleaner app bundle structure
+echo ""
+echo "[Build] Setting up app bundle executable..."
+if [ -f "${BUNDLED_BIN}" ]; then
+    # Create a symlink or copy so the app can be launched as "AceForge"
+    # The Info.plist CFBundleExecutable should point to "AceForge"
+    if [ ! -f "${BUNDLED_APP}/Contents/MacOS/AceForge" ]; then
+        cp "${BUNDLED_BIN}" "${BUNDLED_APP}/Contents/MacOS/AceForge"
+        chmod +x "${BUNDLED_APP}/Contents/MacOS/AceForge"
+    fi
+fi
+
+# Code sign the app bundle (critical for macOS - must be LAST step)
+echo ""
+echo "[Build] Code signing app bundle..."
+if [ -f "${APP_DIR}/build/macos/codesign.sh" ]; then
+    chmod +x "${APP_DIR}/build/macos/codesign.sh"
+    MACOS_SIGNING_IDENTITY="-" "${APP_DIR}/build/macos/codesign.sh" "$BUNDLED_APP"
+    if [ $? -eq 0 ]; then
+        echo "[Build] ✓ Code signing completed"
+        
+        # Remove quarantine attributes (allows app to run without Gatekeeper blocking)
+        echo "[Build] Removing quarantine attributes..."
+        xattr -cr "$BUNDLED_APP" 2>/dev/null || true
+        
+        # Verify the signature
+        echo "[Build] Verifying code signature..."
+        if codesign --verify --deep --strict --verbose=2 "$BUNDLED_APP" &> /dev/null; then
+            echo "[Build] ✓ Code signature verified"
+        else
+            echo "[Build] ⚠ Code signature verification had warnings"
+        fi
+    else
+        echo "[Build] ⚠ Code signing had warnings, but continuing..."
+    fi
+else
+    echo "[Build] ⚠ WARNING: codesign.sh not found, skipping code signing"
+    echo "[Build]   App may show security warnings when launched"
+fi
+
+echo ""
+echo "=========================================="
+echo "✓ Build successful!"
+echo "=========================================="
+echo ""
+echo "App bundle: $BUNDLED_APP"
+echo "Binary: $BUNDLED_BIN"
+echo ""
+echo "⚠ IMPORTANT: macOS Gatekeeper may block adhoc-signed apps"
+echo "   If you see 'app is damaged' warning:"
+echo "   1. Right-click the app → Open (bypasses Gatekeeper)"
+echo "   2. Or run: xattr -cr \"$BUNDLED_APP\""
+echo ""
+echo "To test the app:"
+echo "  1. Check for ACE-Step models:"
+echo "     python ace_model_setup.py"
+echo ""
+echo "  2. Run the app (right-click → Open if blocked):"
+echo "     open \"$BUNDLED_APP\""
+echo ""
+echo "  3. Or run directly:"
+echo "     \"$BUNDLED_BIN\""
+echo ""
+echo "  ✓ New React UI is bundled; app will serve it at / when launched."
+echo ""
+```
+
+### AceForge GitHub Actions Workflow (Complete)
+
+The actual `.github/workflows/build-release.yml` from AceForge:
+
+```yaml
+name: Build macOS Release
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.1.0)'
+        required: true
+        default: 'v0.1.0-macos'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-macos:
+    name: Build macOS Application
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set version from release tag
+      run: |
+        if [ "${{ github.event_name }}" == "release" ]; then
+          # Extract version from release tag (e.g., "v1.0.4" from tag "v1.0.4")
+          VERSION="${{ github.event.release.tag_name }}"
+        else
+          # For workflow_dispatch, use the input version
+          VERSION="${{ github.event.inputs.version }}"
+        fi
+        echo "Setting version to: $VERSION"
+        echo "$VERSION" > VERSION
+        cat VERSION
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Display Python version
+      run: python --version
+
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+    - name: Build new UI (React SPA) with Bun
+      run: ./scripts/build_ui.sh
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements_ace_macos.txt
+        pip install rotary_embedding_torch
+        
+    - name: Install audio-separator (no deps)
+      run: |
+        pip install "audio-separator==0.40.0" --no-deps
+        
+    - name: Install py3langid (no deps)
+      run: |
+        pip install "py3langid==0.3.0" --no-deps
+        
+    - name: Install ACE-Step (no deps)
+      run: |
+        pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
+
+    - name: Install TTS for voice cloning
+      run: |
+        pip install "coqpit" "trainer>=0.0.32" "pysbd>=0.3.4" "inflect>=5.6.0" "unidecode>=1.3.2"
+        pip install "TTS==0.21.2"
+        python -c "from TTS.api import TTS" || (echo "::error::TTS import failed. Voice cloning will not work." && exit 1)
+
+    - name: Install Demucs for stem splitting
+      run: |
+        pip install "demucs==4.0.1"
+        python -c "import demucs.separate" || (echo "::warning::Demucs import failed. Stem splitting may not work." && true)
+
+    - name: Install basic-pitch for MIDI generation
+      run: |
+        pip install "basic-pitch>=0.4.0"
+        python -c "from basic_pitch.inference import predict" || (echo "::warning::basic-pitch import failed. MIDI generation may not work." && true)
+
+    - name: Slim bundle (remove Sudachi if present)
+      run: |
+        pip uninstall -y SudachiDict-core SudachiPy sudachidict-core sudachipy 2>/dev/null || true
+        
+    - name: Install PyInstaller
+      run: |
+        pip install "pyinstaller>=6.0"
+
+    # build/macos must never be deleted: AceForge.icns (app icon), codesign.sh, pyinstaller hooks
+    - name: Check build/macos assets (icon, codesign)
+      run: |
+        if [ ! -f "build/macos/AceForge.icns" ]; then
+          echo "::error::build/macos/AceForge.icns not found. build/macos/ must never be deleted."
+          exit 1
+        fi
+
+    - name: Clean previous PyInstaller outputs
+      run: |
+        rm -rf dist/AceForge.app dist/CDMF build/AceForge
+
+    - name: Build with PyInstaller
+      run: |
+        python -m PyInstaller CDMF.spec --clean --noconfirm
+
+    - name: Set up app bundle executable
+      run: |
+        # CFBundleExecutable is "AceForge"; PyInstaller produces AceForge_bin. Copy so the app runs the real binary (native pywebview, no terminal).
+        cp dist/AceForge.app/Contents/MacOS/AceForge_bin dist/AceForge.app/Contents/MacOS/AceForge
+        chmod +x dist/AceForge.app/Contents/MacOS/AceForge
+        
+    - name: Code sign the app bundle
+      run: |
+        # Run the code signing script with ad-hoc signing (no certificate required for dev builds)
+        # This prevents the "app is damaged" warning that requires sudo xattr -cr
+        # For production releases, set MACOS_SIGNING_IDENTITY secret to your Developer ID
+        chmod +x build/macos/codesign.sh
+        ./build/macos/codesign.sh dist/AceForge.app
+      env:
+        MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY || '-' }}
+        
+    - name: Create DMG (macOS disk image)
+      run: |
+        # Create a temporary directory for DMG contents
+        mkdir -p dmg_temp
+        cp -R dist/AceForge.app dmg_temp/
+        
+        # Copy the .command file for easy launching
+        cp AceForge.command dmg_temp/
+        chmod +x dmg_temp/AceForge.command
+        
+        # Create Applications symlink for easy drag-and-drop install
+        ln -s /Applications dmg_temp/Applications
+        
+        # Copy README for users
+        cp .github/DMG_README.txt dmg_temp/README.txt
+        
+        # Create DMG
+        hdiutil create -volname "AceForge" \
+          -srcfolder dmg_temp \
+          -ov -format UDZO \
+          AceForge-macOS.dmg
+          
+    - name: Create ZIP archive (alternative distribution)
+      run: |
+        cd dist
+        zip -r ../AceForge-macOS.zip AceForge.app
+        cd ..
+        
+    - name: Calculate checksums
+      run: |
+        shasum -a 256 AceForge-macOS.dmg > checksums.txt
+        shasum -a 256 AceForge-macOS.zip >> checksums.txt
+        cat checksums.txt
+        
+    - name: Upload DMG artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AceForge-macOS-DMG
+        path: AceForge-macOS.dmg
+        
+    - name: Upload to Release (if triggered by release)
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          AceForge-macOS.dmg
+          AceForge-macOS.zip
+          checksums.txt
+```
+
+### Key Differences from Templates
+
+These are the **actual production scripts** from AceForge, not templates:
+
+1. **App Name**: `AceForge` not `YourApp`
+2. **Spec File**: `CDMF.spec` (actual spec file)
+3. **Requirements**: `requirements_ace_macos.txt` (actual file)
+4. **Dependencies**: Complete list including TTS, Demucs, basic-pitch, ACE-Step
+5. **Optimizations**: Japanese dictionary removal, bundle slimming
+6. **Caching**: Optional quick build flags for faster development
+7. **UI Build**: React SPA built with Bun via `scripts/build_ui.sh`
+
+These scripts are production-ready, battle-tested, and handle all edge cases including:
+- Optional components (TTS, Demucs, basic-pitch)
+- Build verification at each step
+- Proper error handling and messages
+- macOS-specific optimizations
+- Code signing with multiple modes
+- DMG creation with all assets
+
+---
+
 ### Tools
 
 - **PyInstaller**: `pip install pyinstaller`
