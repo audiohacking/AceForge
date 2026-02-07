@@ -585,6 +585,81 @@ Make it executable:
 chmod +x build_local.sh
 ```
 
+#### Optional: UI Build Script
+
+If your application has a web-based UI (React, Vue, etc.), create a separate script to build it.
+
+**`scripts/build_ui.sh`**:
+
+```bash
+#!/usr/bin/env bash
+# Build the web UI (React/Vite) for your app
+# Output: ui/dist/
+# Run from repo root. Requires Bun or npm.
+
+set -e
+
+# Get script and repo directories
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+UI_DIR="$REPO_ROOT/ui"
+
+echo "=========================================="
+echo "Building Web UI"
+echo "=========================================="
+
+# Verify UI source exists
+if [ ! -f "$UI_DIR/package.json" ]; then
+  echo "ERROR: ui/package.json not found."
+  echo "Ensure UI source is in ui/ directory"
+  exit 1
+fi
+
+# Check for Bun (fast modern bundler)
+if command -v bun &> /dev/null; then
+  echo "Using Bun to build UI..."
+  cd "$UI_DIR"
+  bun install --frozen-lockfile 2>/dev/null || bun install
+  bun run build
+# Fallback to npm
+elif command -v npm &> /dev/null; then
+  echo "Using npm to build UI..."
+  cd "$UI_DIR"
+  npm install
+  npm run build
+else
+  echo "ERROR: Neither Bun nor npm found."
+  echo "Install Bun: https://bun.sh"
+  echo "Or install Node.js: https://nodejs.org"
+  exit 1
+fi
+
+# Verify build output
+if [ ! -f "$UI_DIR/dist/index.html" ]; then
+  echo "ERROR: UI build did not produce ui/dist/index.html"
+  exit 1
+fi
+
+echo ""
+echo "✓ UI build successful: $UI_DIR/dist/"
+```
+
+Make it executable:
+
+```bash
+chmod +x scripts/build_ui.sh
+```
+
+**Usage in build_local.sh:**
+
+```bash
+# Add this to build_local.sh before PyInstaller step
+if [ -d "ui" ] && [ -f "scripts/build_ui.sh" ]; then
+    echo "Building web UI..."
+    ./scripts/build_ui.sh
+fi
+```
+
 ---
 
 ### Step 6: Code Signing
@@ -727,6 +802,9 @@ if sign_binary "$APP_PATH"; then
     echo ""
     echo "Verification:"
     xcrun codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1 || true
+    echo ""
+    echo "Signature info:"
+    xcrun codesign -dv --verbose=4 "$APP_PATH" 2>&1 || true
     exit 0
 else
     echo ""
