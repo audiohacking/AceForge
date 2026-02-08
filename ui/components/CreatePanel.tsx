@@ -179,7 +179,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   // Lego tab only
   const [legoTrackName, setLegoTrackName] = useState('guitar');
   const [legoCaption, setLegoCaption] = useState('');
-  const [legoBackingInfluence, setLegoBackingInfluence] = useState(0.25);
+  const [legoBackingInfluence, setLegoBackingInfluence] = useState(1.0);
   const [legoValidationError, setLegoValidationError] = useState('');
 
   // Shared between Simple and Custom: description/style (genre, mood, etc.) and title
@@ -846,6 +846,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         setLegoValidationError('Please select backing audio (required for Lego).');
         return;
       }
+      // Instruction is auto from track name; caption (style) is optional user description (key, BPM, tone). Backend builds prompt = instruction + ", " + caption when caption present.
       const instruction = `Generate the ${legoTrackName} track based on the audio context:`;
       const effGuidance = guidanceScale;
       const effAudioCover = legoBackingInfluence;
@@ -853,9 +854,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       onGenerate({
         customMode: false,
         songDescription: undefined,
-        prompt: instruction + (legoCaption.trim() ? ', ' + legoCaption.trim() : ''),
+        prompt: legoCaption.trim() ? instruction + ', ' + legoCaption.trim() : instruction,
         lyrics: '',
-        style: legoCaption.trim() || instruction,
+        style: legoCaption.trim(), // caption only; do not send instruction as style (backend uses instruction + style for prompt)
         title: title.trim() || `Lego ${legoTrackName}`,
         instrumental: true,
         vocalLanguage: 'en',
@@ -1677,24 +1678,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               </select>
             </div>
 
-            {/* Describe the track (caption) */}
+            {/* Caption: style/key/BPM (instruction above is auto from track name) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
-              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Describe the track
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
+                Caption (optional)
+                <InfoTooltip text="Instruction is auto-generated from the track name above (e.g. “Generate the GUITAR track…”). Add caption here for style: key, BPM, tone (e.g. “electric guitar riff, C major, 135 BPM”)." />
               </div>
               <textarea
                 value={legoCaption}
                 onChange={(e) => setLegoCaption(e.target.value)}
-                placeholder="e.g. lead guitar melody with bluesy feel, punchy drums, warm bass line..."
+                placeholder="e.g. electric guitar riff, C major, 135 BPM, funk — or leave blank"
                 className="w-full h-24 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
               />
             </div>
 
-            {/* Backing influence (critical for Lego: low = new instrument, high = copy) */}
+            {/* Backing influence: 1.0 avoids MPS crash on Apple Silicon; lower = more "new instrument" but can crash on Mac (ACE-Step-1.5 #117) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
                 Backing influence
-                <InfoTooltip text="How much the backing audio affects the result. Lower (0.2–0.4) = more new instrument from your description; higher = output closer to the backing (can sound like a copy). Start with 0.25 and increase if timing drifts." />
+                <InfoTooltip text="How much the backing audio affects the result. Default 1.0 avoids crashes on Apple Silicon (MPS). Lower (0.2–0.5) = more new instrument from your description but may crash on Mac. For best timing alignment with the backing, use 1.0 and match duration to your source (e.g. 4 bars at 135 BPM ≈ 7.1 s). See ACE-Step-1.5 #117." />
               </div>
               <div className="p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1744,7 +1746,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
                 Lego tuning (optional)
-                <InfoTooltip text="Critical parameters for Lego. Tweak and report what works best: backing influence (low = new instrument, high = copy), guidance (higher = follow prompt more), steps (more = quality)." />
+                <InfoTooltip text="Lego: backing influence 1.0 = stable on all platforms (required on Apple Silicon). Shorter segments (e.g. 4 bars) and matching duration to source BPM improve timing. Thinking is off for Lego so the backing drives context. See ACE-Step-1.5 #117." />
               </div>
               <div className="p-3 space-y-4">
                 <div className="space-y-2">

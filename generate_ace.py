@@ -898,6 +898,7 @@ def _run_ace_text2music(
     lora_weight: float = 0.75,
     cancel_check: Optional[Callable[[], bool]] = None,
     vocal_language: str | None = None,
+    shift: float = 6.0,  # Timestep shift; 3.0 for lego (ACE-Step-1.5 #117)
     # Thinking / LM / CoT (passed to pipeline; used when LM path is integrated)
     thinking: bool = False,
     use_cot_metas: bool = True,
@@ -1016,7 +1017,7 @@ def _run_ace_text2music(
             "batch_size": 1,
             "save_path": str(output_path),
             "debug": False,
-            "shift": 6.0,
+            "shift": float(shift),
         }
         if vocal_language is not None and (vocal_language or "").strip():
             call_kwargs["vocal_language"] = (vocal_language or "").strip()
@@ -1189,6 +1190,7 @@ def generate_track_ace(
     lora_weight: float = 0.75,
     cancel_check: Optional[Callable[[], bool]] = None,
     vocal_language: str = "",
+    shift: float = 6.0,  # Timestep shift; 3.0 recommended for lego (better timing per ACE-Step-1.5 #117)
     # Thinking / LM / CoT (forwarded to pipeline for when LM path is integrated)
     thinking: bool = False,
     use_cot_metas: bool = True,
@@ -1358,6 +1360,7 @@ def generate_track_ace(
         lora_weight=float(lora_weight),
         cancel_check=cancel_check,
         vocal_language=(vocal_language or "").strip() or None,
+        shift=float(shift),
         thinking=thinking,
         use_cot_metas=use_cot_metas,
         use_cot_caption=use_cot_caption,
@@ -1368,6 +1371,7 @@ def generate_track_ace(
         lm_top_p=lm_top_p,
         lm_negative_prompt=(lm_negative_prompt or "").strip() or "NO USER INPUT",
         lm_checkpoint_path=lm_checkpoint_path,
+        shift=shift,
     )
 
     _report_progress(0.90, "fades")

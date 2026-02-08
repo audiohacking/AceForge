@@ -298,13 +298,17 @@ def _run_generation(job_id: str) -> None:
                     bpm = None
             except (TypeError, ValueError):
                 bpm = None
-        # Lego/extract/complete: instruction (uppercase track) + caption appended with comma.
+        # Lego/extract/complete: instruction (uppercase track) + optional caption. Instruction is auto (e.g. "Generate the GUITAR track..."); caption is user style (key, BPM, tone).
         # No metas — BPM/key/timesignature should match the input backing.
         if task in ("lego", "extract", "complete"):
             instruction = _uppercase_track_in_instruction(
                 instruction or "Generate an instrument track based on the audio context:"
             )
-            prompt = (instruction.rstrip(":").strip() + ", " + (caption or "").strip()).strip() if (instruction or caption) else instruction
+            cap = (caption or "").strip()
+            if not cap:
+                prompt = instruction.rstrip(":").strip()
+            else:
+                prompt = (instruction.rstrip(":").strip() + ", " + cap).strip()
             if not prompt:
                 prompt = instruction or "Generate an instrument track based on the audio context"
         title = (params.get("title") or "Untitled").strip() or "Track"
@@ -343,12 +347,13 @@ def _run_generation(job_id: str) -> None:
 
         # When reference/source audio is provided, enable Audio2Audio so ACE-Step uses it (cover/retake/repaint/lego).
         # Defaults aligned with ACE-Step-MCP (ref_audio_strength 0.5) and cover/retake UX (strong source → 0.8).
-        # Lego/extract/complete: low ref_audio_strength so output follows prompt (new instrument), not copy of backing.
+        # Lego/extract/complete: default ref_audio_strength=1.0 to avoid MPS crash (batch dim mismatch when <1.0).
+        # See https://github.com/ace-step/ACE-Step-1.5/issues/117 — lower values can improve "new instrument" feel but crash on Apple Silicon.
         # See docs/ACE-Step-INFERENCE.md: audio_cover_strength 1.0 = strong adherence; lower = more prompt influence.
         audio2audio_enable = bool(src_audio_path)
         ref_default = 0.8 if task in ("cover", "retake") else (0.5 if task == "audio2audio" else 0.7)
         if task in ("lego", "extract", "complete"):
-            ref_default = 0.25  # low strength so output follows prompt (instrument) while matching backing timing
+            ref_default = 1.0  # 1.0 avoids MPS crash; user can lower via legoBackingInfluence if not on Apple Silicon
         # audio_cover_strength per ACE-Step; lego/cover blend use specific overrides when set
         ref_audio_strength = params.get("legoBackingInfluence") if task in ("lego", "extract", "complete") else None
         if ref_audio_strength is None and cover_blend:
@@ -381,6 +386,15 @@ def _run_generation(job_id: str) -> None:
             retake_variance = 0.2
         retake_variance = max(0.0, min(1.0, retake_variance))
 
+        # Shift (timestep): 3.0 recommended for lego/timing; 6.0 pipeline default for others. See ACE-Step-1.5 issue #117.
+        try:
+            shift_val = float(params.get("shift") or params.get("shiftFactor") or 0)
+        except (TypeError, ValueError):
+            shift_val = 0.0
+        if shift_val <= 0:
+            shift_val = 3.0 if task in ("lego", "extract", "complete") else 6.0
+        shift_val = max(0.1, min(10.0, shift_val))
+
         # LoRA adapter (optional): path or folder name under custom_lora
         lora_name_or_path = (params.get("loraNameOrPath") or params.get("lora_name_or_path") or "").strip()
         try:
@@ -389,8 +403,11 @@ def _run_generation(job_id: str) -> None:
             lora_weight = 0.75
         lora_weight = max(0.0, min(2.0, lora_weight))
 
-        # Thinking / LM / CoT (passed through so pipeline or future LM path can use them)
+        # Thinking / LM / CoT (passed through so pipeline or future LM path can use them).
+        # Lego/extract/complete: force thinking=False so src_audio drives context; thinking=True overrides with LLM codes (issue #117).
         thinking = bool(params.get("thinking", False))
+        if task in ("lego", "extract", "complete"):
+            thinking = False
         use_cot_metas = bool(params.get("useCotMetas", True))
         use_cot_caption = bool(params.get("useCotCaption", True))
         # Lego/extract/complete: instruction must stay verbatim ("Generate the X track based on the audio context:").
@@ -466,6 +483,7 @@ def _run_generation(job_id: str) -> None:
             lora_weight=lora_weight,
             cancel_check=cancel_check,
             vocal_language=vocal_lang or "",
+            shift=shift_val,
             thinking=thinking,
             use_cot_metas=use_cot_metas,
             use_cot_caption=use_cot_caption,
