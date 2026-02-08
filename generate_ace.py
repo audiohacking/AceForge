@@ -1371,7 +1371,6 @@ def generate_track_ace(
         lm_top_p=lm_top_p,
         lm_negative_prompt=(lm_negative_prompt or "").strip() or "NO USER INPUT",
         lm_checkpoint_path=lm_checkpoint_path,
-        shift=shift,
     )
 
     _report_progress(0.90, "fades")
