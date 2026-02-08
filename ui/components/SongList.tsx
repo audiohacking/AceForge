@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Song } from '../types';
-import { Play, MoreHorizontal, Heart, ThumbsDown, ListPlus, Pause, Search, Filter, Check, Globe, Lock, Loader2, ThumbsUp, Share2, Video, Info, Clock } from 'lucide-react';
+import { Play, MoreHorizontal, Heart, ThumbsDown, ListPlus, Pause, Search, Filter, Check, Globe, Lock, Loader2, ThumbsUp, Share2, Video, Info, Clock, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
@@ -21,6 +21,8 @@ interface SongListProps {
     onNavigateToProfile?: (username: string) => void;
     onReusePrompt?: (song: Song) => void;
     onDelete?: (song: Song) => void;
+    /** Open Settings (e.g. to install model when job is pending_model). */
+    onOpenSettings?: () => void;
 }
 
 // ... existing code ...
@@ -51,7 +53,8 @@ export const SongList: React.FC<SongListProps> = ({
     onShowDetails,
     onNavigateToProfile,
     onReusePrompt,
-    onDelete
+    onDelete,
+    onOpenSettings
 }) => {
     const { user } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
@@ -283,7 +286,27 @@ const SongItem: React.FC<SongItemProps> = ({
 
                 {song.isGenerating ? (
                     <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1 px-2">
-                        {song.queuePosition ? (
+                        {song.generationStatus === 'pending_model' ? (
+                            /* Waiting for model */
+                            <>
+                                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                    <Clock size={16} className="text-amber-400" />
+                                </div>
+                                <span className="text-[10px] font-medium text-amber-400 text-center">Waiting for model</span>
+                                {song.generationPendingReason && (
+                                    <span className="text-[9px] text-amber-300/90 text-center line-clamp-2">{song.generationPendingReason}</span>
+                                )}
+                                {onOpenSettings && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); onOpenSettings?.(); }}
+                                        className="mt-1 flex items-center gap-1 px-2 py-1 rounded bg-amber-500/30 hover:bg-amber-500/50 text-amber-200 text-[10px] font-medium"
+                                    >
+                                        <Settings size={12} /> Open Settings
+                                    </button>
+                                )}
+                            </>
+                        ) : song.queuePosition ? (
                             /* Queue indicator */
                             <>
                                 <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
@@ -336,7 +359,7 @@ const SongItem: React.FC<SongItemProps> = ({
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
                         <h3 className={`font-bold text-lg truncate ${isCurrent ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-900 dark:text-white'}`}>
-                            {song.title || (song.isGenerating ? (song.queuePosition ? "Queued..." : (song.generationPercent != null ? `Creating... ${Math.round(song.generationPercent)}%` : "Creating...")) : "Untitled")}
+                            {song.title || (song.isGenerating ? (song.generationStatus === 'pending_model' ? "Waiting for model..." : song.queuePosition ? "Queued..." : (song.generationPercent != null ? `Creating... ${Math.round(song.generationPercent)}%` : "Creating...")) : "Untitled")}
                         </h3>
                         <span className="inline-flex items-center justify-center text-[9px] font-bold text-white bg-gradient-to-r from-pink-500 to-purple-500 px-1.5 py-0.5 rounded-sm shadow-sm">
                             v1.5
@@ -450,8 +473,8 @@ const SongItem: React.FC<SongItemProps> = ({
             {/* Timestamp */}
             <div className="text-xs font-mono text-zinc-500 dark:text-zinc-600 self-start pt-1">
                 {song.isGenerating ? (
-                    <span className={song.queuePosition ? 'text-amber-500' : 'text-pink-500'}>
-                        {song.queuePosition ? `#${song.queuePosition}` : (song.generationPercent != null ? `${Math.round(song.generationPercent)}%` : 'Creating...')}
+                    <span className={song.generationStatus === 'pending_model' ? 'text-amber-500' : song.queuePosition ? 'text-amber-500' : 'text-pink-500'}>
+                        {song.generationStatus === 'pending_model' ? 'Waiting for model' : song.queuePosition ? `#${song.queuePosition}` : (song.generationPercent != null ? `${Math.round(song.generationPercent)}%` : 'Creating...')}
                     </span>
                 ) : song.duration}
             </div>

@@ -5,6 +5,7 @@ See docs/ACE-Step-Tutorial.md (DiT Selection Summary, LM options).
 """
 
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import threading
@@ -24,22 +25,22 @@ def _bundled_downloader_available() -> bool:
 
 bp = Blueprint("api_ace_step_models", __name__)
 
-# DiT variants from Tutorial (DiT Selection Summary)
+# DiT variants from Tutorial (DiT Selection Summary). size_gb: approximate for download confirmation.
 DIT_MODELS = [
-    {"id": "turbo", "label": "Turbo (default)", "description": "Best balance, 8 steps", "steps": 8, "cfg": False},
-    {"id": "turbo-shift1", "label": "Turbo shift=1", "description": "Richer details", "steps": 8, "cfg": False},
-    {"id": "turbo-shift3", "label": "Turbo shift=3", "description": "Clearer timbre", "steps": 8, "cfg": False},
-    {"id": "turbo-continuous", "label": "Turbo continuous", "description": "Flexible shift 1–5", "steps": 8, "cfg": False},
-    {"id": "sft", "label": "SFT", "description": "50 steps, CFG", "steps": 50, "cfg": True},
-    {"id": "base", "label": "Base", "description": "50 steps, CFG; lego/extract/complete", "steps": 50, "cfg": True, "exclusive_tasks": ["lego", "extract", "complete"]},
+    {"id": "turbo", "label": "Turbo (default)", "description": "Best balance, 8 steps", "steps": 8, "cfg": False, "size_gb": 8},
+    {"id": "turbo-shift1", "label": "Turbo shift=1", "description": "Richer details", "steps": 8, "cfg": False, "size_gb": 0.5},
+    {"id": "turbo-shift3", "label": "Turbo shift=3", "description": "Clearer timbre", "steps": 8, "cfg": False, "size_gb": 0.5},
+    {"id": "turbo-continuous", "label": "Turbo continuous", "description": "Flexible shift 1–5", "steps": 8, "cfg": False, "size_gb": 0.5},
+    {"id": "sft", "label": "SFT", "description": "50 steps, CFG", "steps": 50, "cfg": True, "size_gb": 8},
+    {"id": "base", "label": "Base", "description": "50 steps, CFG; lego/extract/complete", "steps": 50, "cfg": True, "exclusive_tasks": ["lego", "extract", "complete"], "size_gb": 8},
 ]
 
-# LM planner options from Tutorial
+# LM planner options from Tutorial. size_gb: approximate for download confirmation.
 LM_MODELS = [
-    {"id": "none", "label": "No LM"},
-    {"id": "0.6B", "label": "0.6B"},
-    {"id": "1.7B", "label": "1.7B (default)"},
-    {"id": "4B", "label": "4B"},
+    {"id": "none", "label": "No LM", "size_gb": 0},
+    {"id": "0.6B", "label": "0.6B", "size_gb": 2},
+    {"id": "1.7B", "label": "1.7B (default)", "size_gb": 4},
+    {"id": "4B", "label": "4B", "size_gb": 10},
 ]
 
 # ACE-Step 1.5 CLI model ids (for acestep-download --model)
@@ -331,6 +332,23 @@ def _do_download_worker(model: str, root: Path) -> None:
             _download_progress["error"] = "Cancelled by user" if cancelled else str(e)
     finally:
         _download_cancel_requested = False
+
+
+@bp.route("/models/disk-space", methods=["GET"])
+def disk_space():
+    """
+    GET /api/ace-step/models/disk-space
+    Returns free and total disk space for the models/checkpoints path (for download confirmation).
+    """
+    try:
+        root = _checkpoint_root()
+        root.mkdir(parents=True, exist_ok=True)
+        usage = shutil.disk_usage(str(root))
+        free_gb = round(usage.free / (1024 ** 3), 2)
+        total_gb = round(usage.total / (1024 ** 3), 2)
+        return jsonify({"free_gb": free_gb, "total_gb": total_gb, "path": str(root)})
+    except Exception as e:
+        return jsonify({"error": str(e), "free_gb": None, "total_gb": None, "path": ""}), 500
 
 
 @bp.route("/models/download", methods=["POST"])

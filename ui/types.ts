@@ -11,6 +11,9 @@ export interface Song {
   generationPercent?: number;
   generationSteps?: string;
   generationEtaSeconds?: number;
+  /** When status is pending_model: job is waiting for the required model to be installed. */
+  generationStatus?: 'queued' | 'running' | 'succeeded' | 'failed' | 'pending_model' | 'cancelled';
+  generationPendingReason?: string | null;
   tags: string[];
   audioUrl?: string;
   isPublic?: boolean;
@@ -116,6 +119,8 @@ export interface GenerationParams {
   isFormatCaption?: boolean;
   loraNameOrPath?: string;
   loraWeight?: number;
+  /** Override DiT model for this job (e.g. from Generation tab selector). Only installed models. */
+  aceStepDitModel?: string;
 }
 
 export interface PlayerState {

@@ -674,6 +674,7 @@ export default function App() {
         scoreScale: params.scoreScale,
         lmBatchChunkSize: params.lmBatchChunkSize,
         isFormatCaption: params.isFormatCaption,
+        ...(params.aceStepDitModel ? { aceStepDitModel: params.aceStepDitModel } : {}),
         ...(prefs.output_dir ? { outputDir: prefs.output_dir } : {}),
       };
       console.log('[Create] Calling POST /api/generate');
@@ -684,15 +685,17 @@ export default function App() {
         try {
           const status = await generateApi.getStatus(job.jobId, token ?? '');
 
-          // Update queue position and progress on the temp song
+          // Update queue position and progress on the temp song (including pending_model: waiting for model)
           setSongs(prev => prev.map(s => {
             if (s.id === tempId) {
               return {
                 ...s,
-                queuePosition: status.status === 'queued' ? status.queuePosition : undefined,
+                queuePosition: (status.status === 'queued' || status.status === 'pending_model') ? status.queuePosition : undefined,
                 generationPercent: status.status === 'running' ? status.progressPercent : undefined,
                 generationSteps: status.status === 'running' ? status.progressSteps : undefined,
                 generationEtaSeconds: status.status === 'running' && status.etaSeconds != null ? status.etaSeconds : undefined,
+                generationStatus: status.status as Song['generationStatus'],
+                generationPendingReason: status.pendingReason ?? undefined,
               };
             }
             return s;
@@ -709,7 +712,14 @@ export default function App() {
             cleanupJob(job.jobId, tempId);
             console.error(`Job ${job.jobId} failed:`, status.error);
             showToast(`Generation failed: ${status.error || 'Unknown error'}`, 'error');
+          } else if (status.status === 'cancelled') {
+            cleanupJob(job.jobId, tempId);
+            setSongs(prev => prev.filter(song => song.id !== tempId));
+          } else if (status.status === 'pending_model') {
+            // Promote to queued when model becomes available (e.g. user installed from Settings)
+            generateApi.retryPending().catch(() => {});
           }
+          // pending_model and queued: keep polling; job stays in list
         } catch (pollError) {
           console.error(`Polling error for job ${job.jobId}:`, pollError);
           cleanupJob(job.jobId, tempId);
@@ -1057,6 +1067,7 @@ export default function App() {
                 onNavigateToProfile={handleNavigateToProfile}
                 onReusePrompt={handleReuse}
                 onDelete={handleDeleteSong}
+                onOpenSettings={() => setShowSettingsModal(true)}
               />
             </div>
             {showRightSidebar && (
@@ -1104,6 +1115,7 @@ export default function App() {
                 isGenerating={isGenerating}
                 initialData={reuseData}
                 onOpenSettings={() => setShowSettingsModal(true)}
+                onOpenConsoleLogs={() => setShowConsole(true)}
               />
             </div>
 
@@ -1130,6 +1142,7 @@ export default function App() {
                 onNavigateToProfile={handleNavigateToProfile}
                 onReusePrompt={handleReuse}
                 onDelete={handleDeleteSong}
+                onOpenSettings={() => setShowSettingsModal(true)}
               />
             </div>
 
@@ -1265,6 +1278,7 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         onNavigateToProfile={handleNavigateToProfile}
+        onDownloadComplete={() => generateApi.retryPending().catch(() => {})}
       />
 
       {/* Mobile Details Modal */}

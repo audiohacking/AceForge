@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github, FolderOpen, HardDrive, ZoomIn, Box } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { EditProfileModal } from './EditProfileModal';
@@ -11,6 +11,8 @@ interface SettingsModalProps {
     theme: 'light' | 'dark';
     onToggleTheme: () => void;
     onNavigateToProfile?: (username: string) => void;
+    /** Called when an ACE-Step model download finishes (so pending generation jobs can be retried). */
+    onDownloadComplete?: () => void;
 }
 
 const ZOOM_OPTIONS = [80, 90, 100, 110, 125] as const;
@@ -33,7 +35,7 @@ const ACE_STEP_LM_OPTIONS = [
   { value: '4B', label: '4B' },
 ] as const;
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, onToggleTheme, onNavigateToProfile }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, onToggleTheme, onNavigateToProfile, onDownloadComplete }) => {
     const { user } = useAuth();
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [modelsFolder, setModelsFolder] = useState('');
@@ -45,10 +47,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
     const [aceStepDitModel, setAceStepDitModel] = useState<string>('turbo');
     const [aceStepLm, setAceStepLm] = useState<string>('1.7B');
     const [modelsSaved, setModelsSaved] = useState(false);
-    const [aceStepList, setAceStepList] = useState<{ dit_models: Array<{ id: string; label: string; description?: string; installed: boolean }>; lm_models: Array<{ id: string; label: string; installed: boolean }>; discovered_models?: Array<{ id: string; label: string; path: string; custom: boolean }>; acestep_download_available: boolean } | null>(null);
+    const [aceStepList, setAceStepList] = useState<{ dit_models: Array<{ id: string; label: string; description?: string; installed: boolean; size_gb?: number }>; lm_models: Array<{ id: string; label: string; installed: boolean; size_gb?: number }>; discovered_models?: Array<{ id: string; label: string; path: string; custom: boolean }>; acestep_download_available: boolean } | null>(null);
     const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
     const [downloadError, setDownloadError] = useState<string | null>(null);
     const [downloadStatus, setDownloadStatus] = useState<AceStepDownloadStatus | null>(null);
+    const [pendingDownload, setPendingDownload] = useState<{ id: string; label: string; sizeGb: number } | null>(null);
+    const [diskSpace, setDiskSpace] = useState<{ free_gb: number; total_gb: number } | null>(null);
+    const wasDownloadingRef = useRef(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -72,6 +77,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
     // Poll download status while a download is running (so we show progress and know when it finishes)
     useEffect(() => {
         if (!isOpen || !downloadStatus?.running) return;
+        wasDownloadingRef.current = true;
         const interval = setInterval(() => {
             aceStepModelsApi.downloadStatus()
                 .then((s) => {
@@ -80,12 +86,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                         setDownloadingModel(null);
                         if (s.error && !s.cancelled) setDownloadError(s.error);
                         aceStepModelsApi.list().then(setAceStepList).catch(() => {});
+                        if (wasDownloadingRef.current && !s.error) onDownloadComplete?.();
+                        wasDownloadingRef.current = false;
                     }
                 })
                 .catch(() => {});
         }, 1500);
         return () => clearInterval(interval);
-    }, [isOpen, downloadStatus?.running]);
+    }, [isOpen, downloadStatus?.running, onDownloadComplete]);
 
     // Restrict selection to installed or discovered models: if current choice not in list, switch to first available
     useEffect(() => {
@@ -345,20 +353,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                                         disabled={downloadStatus?.running === true}
                                                         onClick={() => {
                                                             setDownloadError(null);
-                                                            setDownloadingModel(m.id);
-                                                            aceStepModelsApi.download(m.id)
-                                                                .then((r) => {
-                                                                    if (r.error) {
-                                                                        setDownloadError(r.hint ? `${r.error} ${r.hint}` : r.error);
-                                                                        setDownloadingModel(null);
-                                                                    } else {
-                                                                        aceStepModelsApi.downloadStatus().then(setDownloadStatus);
-                                                                    }
-                                                                })
-                                                                .catch((err) => {
-                                                                    setDownloadError(err?.message || 'Download failed');
-                                                                    setDownloadingModel(null);
-                                                                });
+                                                            const sizeGb = (m as { size_gb?: number }).size_gb ?? 8;
+                                                            setPendingDownload({ id: m.id, label: m.label, sizeGb });
+                                                            aceStepModelsApi.diskSpace().then((d) => setDiskSpace(d)).catch(() => setDiskSpace(null));
                                                         }}
                                                         className="text-xs px-2 py-1 rounded bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-50"
                                                     >
@@ -381,20 +378,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                                         disabled={downloadStatus?.running === true}
                                                         onClick={() => {
                                                             setDownloadError(null);
-                                                            setDownloadingModel(m.id);
-                                                            aceStepModelsApi.download(m.id)
-                                                                .then((r) => {
-                                                                    if (r.error) {
-                                                                        setDownloadError(r.error);
-                                                                        setDownloadingModel(null);
-                                                                    } else {
-                                                                        aceStepModelsApi.downloadStatus().then(setDownloadStatus);
-                                                                    }
-                                                                })
-                                                                .catch((err) => {
-                                                                    setDownloadError(err?.message || 'Download failed');
-                                                                    setDownloadingModel(null);
-                                                                });
+                                                            const sizeGb = (m as { size_gb?: number }).size_gb ?? 4;
+                                                            setPendingDownload({ id: m.id, label: m.label, sizeGb });
+                                                            aceStepModelsApi.diskSpace().then((d) => setDiskSpace(d)).catch(() => setDiskSpace(null));
                                                         }}
                                                         className="text-xs px-2 py-1 rounded bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-50"
                                                     >
@@ -603,6 +589,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                     </button>
                 </div>
             </div>
+
+            {/* Confirm model download: ensure user intends to download and has space */}
+            {pendingDownload && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 rounded-2xl" onClick={() => setPendingDownload(null)}>
+                    <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4 border border-zinc-200 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
+                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-2">Download model?</h4>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-300 mb-2">
+                            <strong>{pendingDownload.label}</strong> will use approximately <strong>{pendingDownload.sizeGb} GB</strong>.
+                        </p>
+                        {diskSpace != null && (
+                            <p className="text-sm text-zinc-600 dark:text-zinc-300 mb-4">
+                                You have <strong>{diskSpace.free_gb} GB</strong> free. Ensure you have enough space before continuing.
+                            </p>
+                        )}
+                        {diskSpace != null && pendingDownload.sizeGb > 0 && diskSpace.free_gb < pendingDownload.sizeGb && (
+                            <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">Low disk space. Free at least {pendingDownload.sizeGb - diskSpace.free_gb} GB more.</p>
+                        )}
+                        <div className="flex gap-3 justify-end">
+                            <button type="button" onClick={() => { setPendingDownload(null); setDiskSpace(null); }} className="px-4 py-2 rounded-lg bg-zinc-200 dark:bg-zinc-600 text-zinc-900 dark:text-white font-medium hover:bg-zinc-300 dark:hover:bg-zinc-500">
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const { id, label } = pendingDownload;
+                                    setPendingDownload(null);
+                                    setDiskSpace(null);
+                                    setDownloadError(null);
+                                    setDownloadingModel(id);
+                                    aceStepModelsApi.download(id)
+                                        .then((r) => {
+                                            if (r.error) {
+                                                setDownloadError(r.hint ? `${r.error} ${r.hint}` : r.error);
+                                                setDownloadingModel(null);
+                                            } else {
+                                                aceStepModelsApi.downloadStatus().then(setDownloadStatus);
+                                            }
+                                        })
+                                        .catch((err) => {
+                                            setDownloadError(err?.message || 'Download failed');
+                                            setDownloadingModel(null);
+                                        });
+                                }}
+                                className="px-4 py-2 rounded-lg bg-pink-500 text-white font-medium hover:bg-pink-600"
+                            >
+                                Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <EditProfileModal
                 isOpen={isEditProfileOpen}

@@ -265,22 +265,30 @@ class StreamToLogger:
         
         return False
     
-    def _extract_progress(self, line):
-        """Extract progress bar information from tqdm output"""
-        # Match tqdm progress bar format: " 50%|#####     | 35/70 [05:13<00:52,  1.50s/it]"
-        progress_pattern = r'(\d+)%\s*\|\s*[#\s]+\|\s*(\d+)/(\d+)\s+\[([^\]]+)\]'
-        match = re.search(progress_pattern, line)
-        
-        if match:
-            percent = int(match.group(1))
-            current = int(match.group(2))
-            total = int(match.group(3))
-            time_info = match.group(4)
-            
-            # Format as clean progress message
-            return f"[Progress] {percent}% ({current}/{total} steps) - {time_info}"
-        
+    def _parse_eta_seconds(self, time_info):
+        """Parse tqdm time_info like '01:34<23:38, 94.54s/it' -> remaining seconds (23*60+38)."""
+        if not time_info:
+            return None
+        # Match <MM:SS for remaining time
+        m = re.search(r"<(\d+):(\d+)", time_info)
+        if m:
+            return int(m.group(1)) * 60 + int(m.group(2))
         return None
+
+    def _extract_progress(self, line):
+        """Extract progress bar information from tqdm output. Returns (display_msg, percent, current, total, eta_seconds) or None."""
+        # Match tqdm: " 50%|#####     | 35/70 [05:13<00:52,  1.50s/it]" or "  6%|6         | 1/16 [01:34<23:38, 94.54s/it]"
+        progress_pattern = r"(\d+)%\s*\|\s*[#\s\d]+\|\s*(\d+)/(\d+)\s+\[([^\]]+)\]"
+        match = re.search(progress_pattern, line)
+        if not match:
+            return None
+        percent = int(match.group(1))
+        current = int(match.group(2))
+        total = int(match.group(3))
+        time_info = match.group(4)
+        eta_seconds = self._parse_eta_seconds(time_info)
+        display_msg = f"[Progress] {percent}% ({current}/{total} steps) - {time_info}"
+        return (display_msg, percent, current, total, eta_seconds)
 
     def _prefix_job_id(self, msg):
         """If a generation job is active in this thread, prefix the message with job id."""
@@ -311,13 +319,19 @@ class StreamToLogger:
                 if self._should_filter(line_clean):
                     continue
                 
-                # Try to extract progress bar info
-                progress_msg = self._extract_progress(line_clean)
-                if progress_msg:
-                    # Only log if it's different from last progress (avoid duplicates)
-                    if progress_msg != self.last_progress:
-                        self.logger.log(logging.INFO, self._prefix_job_id(progress_msg))
-                        self.last_progress = progress_msg
+                # Try to extract progress bar info (returns (display_msg, percent, current, total, eta_seconds) or None)
+                progress_data = self._extract_progress(line_clean)
+                if progress_data:
+                    display_msg, percent, current, total, eta_seconds = progress_data
+                    if display_msg != self.last_progress:
+                        self.logger.log(logging.INFO, self._prefix_job_id(display_msg))
+                        self.last_progress = display_msg
+                    try:
+                        updater = cdmf_state.get_progress_updater()
+                        if updater:
+                            updater(percent, current, total, eta_seconds)
+                    except Exception:
+                        pass
                     continue
                 
                 # Log other messages normally (with optional job id prefix)
@@ -334,11 +348,18 @@ class StreamToLogger:
         if self.linebuf:
             line_clean = self.linebuf.rstrip()
             if line_clean and not self._should_filter(line_clean):
-                progress_msg = self._extract_progress(line_clean)
-                if progress_msg:
-                    if progress_msg != self.last_progress:
-                        self.logger.log(logging.INFO, self._prefix_job_id(progress_msg))
-                        self.last_progress = progress_msg
+                progress_data = self._extract_progress(line_clean)
+                if progress_data:
+                    display_msg, percent, current, total, eta_seconds = progress_data
+                    if display_msg != self.last_progress:
+                        self.logger.log(logging.INFO, self._prefix_job_id(display_msg))
+                        self.last_progress = display_msg
+                    try:
+                        updater = cdmf_state.get_progress_updater()
+                        if updater:
+                            updater(percent, current, total, eta_seconds)
+                    except Exception:
+                        pass
                 else:
                     self.logger.log(self.log_level, self._prefix_job_id(line_clean))
             self.linebuf = ''

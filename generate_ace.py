@@ -180,6 +180,7 @@ except Exception as e:  # import-time diagnostics only
 # -----------------------------------------------------------------------------
 
 import cdmf_paths
+import cdmf_state
 
 # Default target length + fades (UI can override)
 DEFAULT_TARGET_SECONDS = 150.0
@@ -437,32 +438,91 @@ def _get_ace_pipeline() -> "ACEStepPipeline":
         if _ACE_PIPELINE is not None:
             return _ACE_PIPELINE
 
-        print(
-            "[ACE] Initializing ACEStepPipeline (first time will download/load checkpoints)...",
-            flush=True,
-        )
-        _report_progress(0.05, "ace_load")
-
-        # Make sure our dedicated ACE cache under ace_models/checkpoints is ready.
+        # Notify UI that model may be downloading (pipeline load can trigger HuggingFace fetch).
         try:
-            checkpoint_root = ensure_ace_models()
-        except Exception as exc:
-            raise RuntimeError(
-                "Failed to prepare ACE-Step checkpoints. "
-                "See the console logs above for details."
-            ) from exc
+            cdmf_state.GENERATION_MODEL_LOADING["in_progress"] = True
+            cdmf_state.GENERATION_MODEL_LOADING["message"] = "Preparing model (downloading if needed)..."
+        except Exception:
+            pass
 
-        # Wire ACE's internal progress bars into our callback before heavy work starts.
-        _monkeypatch_ace_tqdm()
+        try:
+            print(
+                "[ACE] Initializing ACEStepPipeline (first time will download/load checkpoints)...",
+                flush=True,
+            )
+            _report_progress(0.05, "ace_load")
 
-        # Tell ACE-Step to use our cache root as its checkpoint_dir so it
-        # doesn't try to re-download into ~/.cache/ace-step/checkpoints.
-        pipeline = ACEStepPipeline(checkpoint_dir=str(checkpoint_root))
-        _ACE_PIPELINE = pipeline
+            # Resolve checkpoint path: use ACE-Step 1.5 model folder from config when present (e.g. base for cover).
+            # Never trigger downloads from generation; require model to be installed via Settings → Models.
+            DIT_15_FOLDERS = {
+                "turbo": "acestep-v15-turbo",
+                "base": "acestep-v15-base",
+                "sft": "acestep-v15-sft",
+                "turbo-shift1": "acestep-v15-turbo-shift1",
+                "turbo-shift3": "acestep-v15-turbo-shift3",
+                "turbo-continuous": "acestep-v15-turbo-continuous",
+            }
+            REQUIRED_SUBDIRS = ("music_dcae_f8c8", "music_vocoder", "ace_step_transformer", "umt5-base")
+            config = cdmf_paths.load_config()
+            dit = (config.get("ace_step_dit_model") or "turbo").strip().lower()
+            folder = DIT_15_FOLDERS.get(dit)
+            models_root = Path(cdmf_paths.get_models_folder()) / "checkpoints"
+            checkpoint_root = None
+            if folder:
+                candidate = models_root / folder
+                if not candidate.exists():
+                    raise RuntimeError(
+                        f"Model '{dit}' is not installed. Please install it from Settings → Models "
+                        "(do not start generation to trigger downloads)."
+                    )
+                for sub in REQUIRED_SUBDIRS:
+                    if not (candidate / sub).exists():
+                        raise RuntimeError(
+                            f"Model '{dit}' is not fully installed (missing {sub}). "
+                            "Please install or re-download it from Settings → Models."
+                        )
+                checkpoint_root = candidate
+                print(f"[ACE] Using DiT model '{dit}' at {checkpoint_root}", flush=True)
+            if checkpoint_root is None:
+                # Legacy v1 path: only use if already present; never download from here.
+                from ace_model_setup import ace_models_present
+                if not ace_models_present():
+                    raise RuntimeError(
+                        "ACE-Step model is not installed. Please install it from Settings → Models "
+                        "(do not start generation to trigger downloads)."
+                    )
+                try:
+                    checkpoint_root = ensure_ace_models()
+                except Exception as exc:
+                    raise RuntimeError(
+                        "Failed to prepare ACE-Step checkpoints. "
+                        "See the console logs above for details."
+                    ) from exc
 
-        print("[ACE] ACEStepPipeline ready.", flush=True)
+            # Wire ACE's internal progress bars into our callback before heavy work starts.
+            _monkeypatch_ace_tqdm()
+
+            # Tell ACE-Step to use our cache root as its checkpoint_dir so it
+            # doesn't try to re-download into ~/.cache/ace-step/checkpoints.
+            pipeline = ACEStepPipeline(checkpoint_dir=str(checkpoint_root))
+            _ACE_PIPELINE = pipeline
+
+            print("[ACE] ACEStepPipeline ready.", flush=True)
+            return _ACE_PIPELINE
+        finally:
+            try:
+                cdmf_state.GENERATION_MODEL_LOADING["in_progress"] = False
+            except Exception:
+                pass
 
     return _ACE_PIPELINE
+
+
+def clear_ace_pipeline() -> None:
+    """Clear the cached pipeline so the next call to _get_ace_pipeline() loads fresh (e.g. after switching DiT model)."""
+    global _ACE_PIPELINE
+    with _ACE_PIPELINE_LOCK:
+        _ACE_PIPELINE = None
 
 
 # -----------------------------------------------------------------------------
@@ -569,11 +629,10 @@ def _prepare_reference_audio(
     """
     Normalise the ACE-Step edit / audio2audio mode (task_type, reference_audio, src_audio per Tutorial/INFERENCE):
 
-      - Task (task_type) is clamped to one of: text2music / retake / repaint / extend.
-      - UI tasks "cover" and "audio2audio" are mapped to "retake" (ACE-Step
-        then uses ref_audio_input and sets task to "audio2audio" internally).
-      - If Audio2Audio is enabled while task is still 'text2music', we
-        internally flip it to 'retake' (this is how ACE-Step expects edits).
+      - Task (task_type) is clamped to one of: text2music / audio2audio / retake / repaint / extend.
+      - UI tasks "cover" and "audio2audio" are passed as task="audio2audio" (INFERENCE.md:
+        cover uses src_audio = song to cover; we pass it as ref_audio_input, no retake path).
+      - If Audio2Audio is enabled while task is still 'text2music', we set task to 'audio2audio'.
       - For any edit mode (retake/repaint/extend) we prefer to have a
         reference audio file and make sure ACE-Step sees a .wav path.
         If no reference is provided, we *gracefully* fall back to
@@ -582,19 +641,19 @@ def _prepare_reference_audio(
     task_norm = (task or "text2music").strip().lower()
     if task_norm not in ("text2music", "retake", "repaint", "extend", "cover", "audio2audio", "lego", "extract", "complete"):
         task_norm = "text2music"
-    # Map UI task names to pipeline task: cover and audio2audio both run as retake
-    # (pipeline will set task to "audio2audio" when ref_audio_input is passed).
+    # Per docs/ACE-Step-INFERENCE.md: cover uses src_audio (song to cover) + caption (target style).
+    # Pass task="audio2audio" so the pipeline uses ref_audio_input only (no retake/repaint path).
     if task_norm in ("cover", "audio2audio"):
-        task_norm = "retake"
+        task_norm = "audio2audio"
 
     # Audio2Audio is effectively an edit of an existing clip. If the user
-    # left the task on "Text → music", run it as a retake under the hood.
+    # left the task on "Text → music" but provided ref audio, run as audio2audio.
     if audio2audio_enable and task_norm == "text2music":
-        task_norm = "retake"
+        task_norm = "audio2audio"
 
     # Any of the edit-style tasks imply some form of Audio2Audio or source-backed (lego/extract/complete).
     audio2audio_flag = bool(
-        audio2audio_enable or task_norm in ("retake", "repaint", "extend")
+        audio2audio_enable or task_norm in ("audio2audio", "retake", "repaint", "extend")
     )
     needs_src_path = audio2audio_flag or task_norm in ("lego", "extract", "complete")
 
