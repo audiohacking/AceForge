@@ -3,6 +3,7 @@ import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash,
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { generateApi, preferencesApi, aceStepModelsApi, type LoraAdapter } from '../services/api';
+import { useTranslation } from 'react-i18next';
 
 /** Tasks that require ACE-Step Base model only (see docs/ACE-Step-Tutorial.md). */
 const TASKS_REQUIRING_BASE = ['lego', 'extract', 'complete'] as const;
@@ -156,6 +157,7 @@ const VOCAL_LANGUAGES = [
 type CreateMode = 'simple' | 'custom' | 'cover' | 'lego';
 
 export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, initialData, onOpenSettings }) => {
+  const { t } = useTranslation();
   const { isAuthenticated, token } = useAuth();
 
   // Mode: simple | custom | cover | lego
@@ -965,19 +967,19 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               onClick={() => { setCreateMode('simple'); setLegoValidationError(''); setCoverValidationError(''); }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'simple' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
-              Simple
+              {t('create.modes.simple')}
             </button>
             <button
               onClick={() => { setCreateMode('custom'); setLegoValidationError(''); setCoverValidationError(''); }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'custom' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
-              Custom
+              {t('create.modes.custom')}
             </button>
             <button
               onClick={() => { setCreateMode('cover'); setLegoValidationError(''); setCoverValidationError(''); }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'cover' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
-              Cover
+              {t('create.modes.cover')}
             </button>
             <button
               onClick={() => {
@@ -988,7 +990,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'lego' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
-              Lego
+              {t('create.modes.lego')}
             </button>
           </div>
         </div>
@@ -999,13 +1001,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Title (same as Custom mode) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Title
+                {t('create.inputs.title')}
               </div>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Name your song"
+                placeholder={t('create.inputs.title_placeholder')}
                 className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
               />
             </div>
@@ -1013,12 +1015,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Genre preset + Song Description */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Describe Your Song
-                <InfoTooltip text="Use a genre preset to fill tags (style, instruments, BPM), or type your own description. Presets use ACE-Step-style comma-separated tags." />
+                {t('create.inputs.describe_song')}
+                <InfoTooltip text={t('create.tooltips.describe_song')} />
               </div>
               <div className="p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <label className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 shrink-0">Genre preset:</label>
+                  <label className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 shrink-0">{t('create.inputs.genre_preset')}:</label>
                   <select
                     value={Object.keys(GENRE_PRESETS).find(k => GENRE_PRESETS[k] === style) || 'Custom'}
                     onChange={(e) => {
@@ -1033,7 +1035,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                     }}
                     className="bg-zinc-100 dark:bg-black/30 text-zinc-900 dark:text-white text-xs rounded-lg px-2.5 py-1.5 border-0 focus:ring-2 focus:ring-pink-500/50 focus:outline-none"
                   >
-                    <option value="Custom">Custom (type below)</option>
+                    <option value="Custom">{t('create.inputs.custom_genre')}</option>
                     {Object.keys(GENRE_PRESETS).map((name) => (
                       <option key={name} value={name}>{name}</option>
                     ))}
@@ -1042,7 +1044,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 <textarea
                   value={style}
                   onChange={(e) => setStyle(e.target.value)}
-                  placeholder="e.g. A happy pop song about summer... or use a genre preset above"
+                  placeholder={t('create.inputs.describe_placeholder')}
                   className="w-full h-28 bg-transparent text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none border-0 p-0"
                 />
               </div>
@@ -1051,7 +1053,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Vocal Language (Simple) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Vocal Language
+                {t('create.inputs.vocal_language')}
               </div>
               <select
                 value={vocalLanguage}
@@ -1067,8 +1069,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Quality preset (Simple + Advanced) — Basic / Great / Best from ACE-Step docs */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Quality
-                <InfoTooltip text="Basic: fast, fewer steps. Great: balanced. Best: maximum quality (more steps, higher guidance, LM thinking)." />
+                {t('create.quality.label')}
+                <InfoTooltip text={t('create.tooltips.quality')} />
               </div>
               <div className="p-3 flex gap-2">
                 {(['basic', 'great', 'best'] as const).map((p) => (
@@ -1082,7 +1084,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                         : 'bg-zinc-100 dark:bg-black/30 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/10'
                     }`}
                   >
-                    {p === 'basic' ? 'Basic' : p === 'great' ? 'Great' : 'Best'}
+                    {p === 'basic' ? t('create.quality.basic') : p === 'great' ? t('create.quality.great') : t('create.quality.best')}
                   </button>
                 ))}
               </div>
@@ -1092,14 +1094,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 flex items-center gap-2">
                 <Wrench size={14} className="text-zinc-500 dark:text-zinc-400 shrink-0" />
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Exclude styles</label>
-                <InfoTooltip text="Things to avoid in the output (e.g. genres, instruments, mood). Added as negative guidance." />
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.inputs.exclude_styles')}</label>
+                <InfoTooltip text={t('create.tooltips.exclude_styles')} />
               </div>
               <input
                 type="text"
                 value={negativePrompt}
                 onChange={(e) => setNegativePrompt(e.target.value)}
-                placeholder="e.g. heavy distortion, screaming"
+                placeholder={t('create.inputs.exclude_placeholder')}
                 className="w-full bg-transparent px-3 pb-3 pt-0 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none border-0"
               />
             </div>
@@ -1108,15 +1110,15 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
               <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-2">
                 <Sliders size={14} />
-                Generation influence
+                {t('create.generation_influence')}
               </h3>
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Fine-tune how the model follows your description and reference (if any).</p>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1.5">
-                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weirdness</label>
-                    <InfoTooltip text="Higher = more creative/experimental; lower = more predictable and on-prompt." />
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.sliders.weirdness')}</label>
+                    <InfoTooltip text={t('create.tooltips.weirdness')} />
                   </span>
                   <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{weirdness}%</span>
                 </div>
@@ -1134,8 +1136,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1.5">
-                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Style influence</label>
-                    <InfoTooltip text="How strongly the style/caption is followed. Higher = closer to your description." />
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.sliders.style_influence')}</label>
+                    <InfoTooltip text={t('create.tooltips.style_influence')} />
                   </span>
                   <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{styleInfluence}%</span>
                 </div>
@@ -1154,8 +1156,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-1.5">
-                      <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Audio influence</label>
-                      <InfoTooltip text="How much the reference/cover audio influences the result. Higher = stronger reference style." />
+                      <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.sliders.audio_influence')}</label>
+                      <InfoTooltip text={t('create.tooltips.audio_influence')} />
                     </span>
                     <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{audioInfluence}%</span>
                   </div>
@@ -1174,7 +1176,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
 
             {/* Reference & cover (optional) — same as Custom but compact; no hidden features */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-3">
-              <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Reference & cover (optional)</h3>
+              <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('create.reference_cover')}</h3>
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Use a style reference or a song to cover. Leave empty to generate from your description only.</p>
               <div className="space-y-3">
                 <div>
@@ -1182,7 +1184,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                     <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Reference style</span>
                     <div className="flex gap-1.5">
                       <button type="button" onClick={() => openAudioModal('reference')} className="flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
-                        Choose from library
+                        {t('create.inputs.choose_library')}
                       </button>
                     </div>
                   </div>
@@ -1193,7 +1195,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                     <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Song to cover</span>
                     <div className="flex gap-1.5">
                       <button type="button" onClick={() => openAudioModal('source')} className="flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
-                        Choose from library
+                        {t('create.inputs.choose_library')}
                       </button>
                     </div>
                   </div>
@@ -1206,13 +1208,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
               <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-2">
                 <Sliders size={14} />
-                Quick Settings
+                {t('create.quick_settings')}
               </h3>
 
               {/* Duration */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Duration</label>
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.sliders.duration')}</label>
                   <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">
                     {duration === -1 ? 'Auto' : `${duration}s`}
                   </span>
@@ -1231,7 +1233,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               {/* BPM */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">BPM</label>
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.sliders.bpm')}</label>
                   <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">
                     {bpm === 0 ? 'Auto' : bpm}
                   </span>
@@ -1280,7 +1282,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               {/* Variations */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Variations</label>
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.sliders.variations')}</label>
                   <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{batchSize}</span>
                 </div>
                 <input
@@ -1303,20 +1305,20 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
           <div className="space-y-5">
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4">
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Generate a new version of your source audio in a different style. One source + one style description (e.g. &quot;jazz piano cover with swing rhythm&quot;). No semantic blending — pure cover task.
+                {t('create.audio_modal.cover_desc')}
               </p>
             </div>
 
             {/* Title (optional) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Title (optional)
+                {t('create.inputs.title_optional')}
               </div>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Name the output"
+                placeholder={t('create.inputs.title_placeholder_output')}
                 className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
               />
             </div>
@@ -1324,17 +1326,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Source audio (required) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Source audio
+                {t('create.inputs.source_audio')}
                 <span className="text-red-500">*</span>
-                <InfoTooltip text="The audio to re-style (cover). Required." />
+                <InfoTooltip text={t('create.inputs.source_audio_desc')} />
               </div>
               <div className="p-3 space-y-2">
                 <div className="flex gap-2">
                   <button type="button" onClick={() => openAudioModal('source')} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
-                    Choose from library
+                    {t('create.inputs.choose_library')}
                   </button>
                 </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Pick a track from your library or upload in the picker (uploads go to the library).</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{t('create.inputs.source_audio_desc')}</p>
                 {sourceAudioUrl ? (
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 truncate" title={sourceAudioUrl}>{getAudioLabel(sourceAudioUrl)}</p>
                 ) : (
@@ -1346,14 +1348,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Cover style (caption) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Cover style
+                {t('create.inputs.cover_style')}
                 <span className="text-red-500">*</span>
-                <InfoTooltip text="Describe the target style (e.g. jazz piano cover with swing rhythm, orchestral version, lo-fi hip hop)." />
+                <InfoTooltip text={t('create.inputs.cover_style_placeholder')} />
               </div>
               <textarea
                 value={coverCaption}
                 onChange={(e) => setCoverCaption(e.target.value)}
-                placeholder="e.g. jazz piano cover with swing rhythm"
+                placeholder={t('create.inputs.cover_style_placeholder')}
                 className="w-full h-24 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
               />
             </div>
@@ -1361,8 +1363,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Cover strength */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Source influence
-                <InfoTooltip text="How much the output follows the source (1 = strong adherence, lower = more influence from your cover style)." />
+                {t('create.inputs.source_influence')}
+                <InfoTooltip text={t('create.tooltips.source_influence')} />
               </div>
               <div className="p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1389,8 +1391,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Instrumental / Lyrics override for cover */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Vocals
-                <InfoTooltip text="Instrumental: no vocals. Vocal: override the cover with your own lyrics (e.g. [Verse], [Chorus])." />
+                {t('create.inputs.vocal_mode')}
+                <InfoTooltip text={t('create.tooltips.instrumental')} />
               </div>
               <div className="p-3 space-y-3">
                 <div className="flex items-center gap-2">
@@ -1401,13 +1403,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   >
                     <div className={`w-4 h-4 rounded-full bg-white transform transition-transform duration-200 shadow-sm ${instrumental ? 'translate-x-5' : 'translate-x-0'}`} />
                   </button>
-                  <span className="text-xs text-zinc-600 dark:text-zinc-400">{instrumental ? 'Instrumental' : 'Vocal (custom lyrics)'}</span>
+                  <span className="text-xs text-zinc-600 dark:text-zinc-400">{instrumental ? t('create.inputs.instrumental') : t('create.inputs.vocal_custom')}</span>
                 </div>
                 {!instrumental && (
                   <textarea
                     value={lyrics}
                     onChange={(e) => setLyrics(e.target.value)}
-                    placeholder="[Verse]\nYour lyrics for the cover...\n\n[Chorus]\n..."
+                    placeholder={t('create.inputs.lyrics_placeholder_cover')}
                     className="w-full h-28 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none font-mono leading-relaxed border border-zinc-200 dark:border-white/10 rounded-lg"
                   />
                 )}
@@ -1417,24 +1419,24 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Optional: Blend with second audio */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Optional: Blend with a second audio
-                <InfoTooltip text="Add a second track to blend structure (source) with style/timbre from another. Leave empty for a single-source cover." />
+                {t('create.inputs.blend_audio')}
+                <InfoTooltip text={t('create.inputs.blend_desc')} />
               </div>
               <div className="p-3 space-y-3">
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Combine the source above with another track: structure and length follow the source; style can follow the second audio.
+                  {t('create.inputs.blend_desc')}
                 </p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => openAudioModal('cover_style')} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
-                    Choose from library
+                    {t('create.inputs.choose_library')}
                   </button>
                 </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Pick from library or upload in the picker (uploads go to the library).</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{t('create.inputs.source_audio_desc')}</p>
                 {coverStyleAudioUrl ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-xs text-emerald-600 dark:text-emerald-400 truncate flex-1 min-w-0" title={coverStyleAudioUrl}>{getAudioLabel(coverStyleAudioUrl)}</p>
                     <button type="button" onClick={() => setCoverStyleAudioUrl('')} className="shrink-0 px-2 py-1 text-[11px] font-medium rounded bg-zinc-200 dark:bg-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-white/20">
-                      Clear
+                      {t('create.inputs.clear')}
                     </button>
                   </div>
                 ) : (
@@ -1469,8 +1471,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Quality preset */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Quality
-                <InfoTooltip text="Basic: fast. Great: balanced. Best: maximum quality." />
+                {t('create.quality.label')}
+                <InfoTooltip text={t('create.tooltips.quality')} />
               </div>
               <div className="p-3 flex gap-2">
                 {(['basic', 'great', 'best'] as const).map((p) => (
@@ -1482,7 +1484,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                       qualityPreset === p ? 'bg-pink-500 text-white' : 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/10'
                     }`}
                   >
-                    {p === 'basic' ? 'Basic' : p === 'great' ? 'Great' : 'Best'}
+                    {p === 'basic' ? t('create.quality.basic') : p === 'great' ? t('create.quality.great') : t('create.quality.best')}
                   </button>
                 ))}
               </div>
@@ -1506,13 +1508,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Title (optional) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Title (optional)
+                {t('create.inputs.title_optional')}
               </div>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Name the output"
+                placeholder={t('create.inputs.title_placeholder_output')}
                 className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
               />
             </div>
@@ -1520,17 +1522,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Source audio (required for Lego) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Backing audio
+                {t('create.inputs.backing_audio')}
                 <span className="text-red-500">*</span>
                 <InfoTooltip text="The existing audio to add an instrument track to. Required for Lego." />
               </div>
               <div className="p-3 space-y-2">
                 <div className="flex gap-2">
                   <button type="button" onClick={() => openAudioModal('source')} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
-                    Choose from library
+                    {t('create.inputs.choose_library')}
                   </button>
                 </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Pick a track from your library or upload in the picker (uploads go to the library).</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{t('create.inputs.backing_audio_desc')}</p>
                 {sourceAudioUrl ? (
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 truncate" title={sourceAudioUrl}>{getAudioLabel(sourceAudioUrl)}</p>
                 ) : (
@@ -1542,7 +1544,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Track to generate */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Track to generate
+                {t('create.inputs.track_to_generate')}
               </div>
               <select
                 value={legoTrackName}
@@ -1558,12 +1560,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Describe the track (caption) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Describe the track
+                {t('create.inputs.describe_track')}
               </div>
               <textarea
                 value={legoCaption}
                 onChange={(e) => setLegoCaption(e.target.value)}
-                placeholder="e.g. lead guitar melody with bluesy feel, punchy drums, warm bass line..."
+                placeholder={t('create.inputs.describe_track_placeholder')}
                 className="w-full h-24 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
               />
             </div>
@@ -1571,8 +1573,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Backing influence (critical for Lego: low = new instrument, high = copy) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Backing influence
-                <InfoTooltip text="How much the backing audio affects the result. Lower (0.2–0.4) = more new instrument from your description; higher = output closer to the backing (can sound like a copy). Start with 0.25 and increase if timing drifts." />
+                {t('create.inputs.backing_influence')}
+                <InfoTooltip text={t('create.tooltips.backing_influence')} />
               </div>
               <div className="p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1599,8 +1601,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Quality preset (Lego) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Quality
-                <InfoTooltip text="Basic: fast. Great: balanced. Best: maximum quality (more steps, LM thinking)." />
+                {t('create.quality.label')}
+                <InfoTooltip text={t('create.tooltips.quality')} />
               </div>
               <div className="p-3 flex gap-2">
                 {(['basic', 'great', 'best'] as const).map((p) => (
@@ -1612,7 +1614,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                       qualityPreset === p ? 'bg-pink-500 text-white' : 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/10'
                     }`}
                   >
-                    {p === 'basic' ? 'Basic' : p === 'great' ? 'Great' : 'Best'}
+                    {p === 'basic' ? t('create.quality.basic') : p === 'great' ? t('create.quality.great') : t('create.quality.best')}
                   </button>
                 ))}
               </div>
@@ -1627,7 +1629,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="p-3 space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Backing influence</label>
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.inputs.backing_influence')}</label>
                     <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{legoBackingInfluence.toFixed(2)}</span>
                   </div>
                   <input
@@ -1643,7 +1645,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Guidance scale</label>
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.sliders.guidance_scale')}</label>
                     <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{guidanceScale.toFixed(1)}</span>
                   </div>
                   <input
@@ -1659,7 +1661,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Inference steps</label>
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('create.sliders.inference_steps')}</label>
                     <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{inferenceSteps}</span>
                   </div>
                   <input
@@ -1685,13 +1687,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Title */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Title
+                {t('create.inputs.title')}
               </div>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Name your song"
+                placeholder={t('create.inputs.title_placeholder')}
                 className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
               />
             </div>
@@ -1701,7 +1703,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5">
                 <div>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Style of Music</span>
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('create.inputs.style_of_music')}</span>
                     <InfoTooltip text={(taskType === 'cover' || taskType === 'audio2audio') ? 'Target style for the cover (genre, mood, instruments). Lower Cover Strength gives this more influence over the source.' : 'Genre, mood, instruments, vibe. Same as Simple mode — switching tabs keeps this text.'} />
                   </span>
                   <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Genre, mood, instruments, vibe</p>
@@ -1717,7 +1719,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               </div>
               <div className="p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <label className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 shrink-0">Genre preset:</label>
+                  <label className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 shrink-0">{t('create.inputs.genre_preset')}:</label>
                   <select
                     value={Object.keys(GENRE_PRESETS).find(k => GENRE_PRESETS[k] === style) || 'Custom'}
                     onChange={(e) => {
@@ -1732,7 +1734,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                     }}
                     className="bg-zinc-100 dark:bg-black/30 text-zinc-900 dark:text-white text-xs rounded-lg px-2.5 py-1.5 border-0 focus:ring-2 focus:ring-pink-500/50 focus:outline-none"
                   >
-                    <option value="Custom">Custom (type below)</option>
+                    <option value="Custom">{t('create.inputs.custom_genre')}</option>
                     {Object.keys(GENRE_PRESETS).map((name) => (
                       <option key={name} value={name}>{name}</option>
                     ))}
@@ -1741,7 +1743,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 <textarea
                   value={style}
                   onChange={(e) => setStyle(e.target.value)}
-                  placeholder="e.g. upbeat pop rock, emotional ballad, 90s hip hop — or use a genre preset above"
+                  placeholder={t('create.inputs.style_placeholder')}
                   className="w-full h-20 bg-transparent text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none border-0 p-0"
                 />
               </div>
@@ -1767,10 +1769,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
                 <div>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Lyrics</span>
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('create.inputs.lyrics')}</span>
                     <InfoTooltip text={(taskType === 'cover' || taskType === 'audio2audio') ? 'Target lyrics for the cover. Uncheck Instrumental to use them. Lower Cover Strength gives your lyrics more influence.' : 'Lyric content and structure. Use [Verse], [Chorus], etc. Leave empty or use Instrumental for no vocals.'} />
                   </span>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Leave empty for instrumental or switch to Instrumental below</p>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-400 mt-0.5">Leave empty for instrumental or switch to Instrumental below</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1781,7 +1783,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                         : 'bg-white dark:bg-suno-card border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10'
                     }`}
                   >
-                    {instrumental ? 'Instrumental' : 'Vocal'}
+                    {instrumental ? t('create.inputs.instrumental') : t('create.inputs.vocal_mode')}
                   </button>
                   <button
                     className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormatting ? 'text-pink-500 animate-pulse' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
@@ -1803,7 +1805,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 disabled={instrumental}
                 value={lyrics}
                 onChange={(e) => setLyrics(e.target.value)}
-                placeholder={instrumental ? "Instrumental mode - no lyrics needed" : "[Verse]\nYour lyrics here...\n\n[Chorus]\nThe catchy part..."}
+                placeholder={instrumental ? "Instrumental mode - no lyrics needed" : t('create.inputs.lyrics_placeholder')}
                 className={`w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none font-mono leading-relaxed ${instrumental ? 'opacity-30 cursor-not-allowed' : ''}`}
                 style={{ height: `${lyricsHeight}px` }}
               />
@@ -1818,7 +1820,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Vocal Language (Custom) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
-                Vocal Language
+                {t('create.inputs.vocal_language')}
                 <InfoTooltip text="ISO 639-1 language code for vocals. Auto/unknown lets the model detect. Affects vocal characteristics when not in Instrumental mode." />
               </div>
               <select
@@ -1843,7 +1845,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="px-3 py-2.5 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/[0.02]">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Audio</span>
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('create.inputs.audio')}</span>
                     {referenceAudioUrl && (
                       <p className="text-[11px] text-pink-600 dark:text-pink-400 mt-0.5 truncate" title={referenceAudioUrl}>
                         Reference: {getAudioLabel(referenceAudioUrl)}
@@ -1960,11 +1962,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                     <div className="flex gap-2 justify-center">
                       <button type="button" onClick={() => openAudioModal('reference')} className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
-                        Choose from Library
+                        {t('create.inputs.choose_library')}
                       </button>
                       <button type="button" onClick={() => openAudioModal('reference')} className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                        Upload
+                        {t('create.inputs.upload')}
                       </button>
                     </div>
                   </div>
@@ -2819,14 +2821,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-xl font-semibold text-zinc-900 dark:text-white">
-                    {audioModalTarget === 'reference' ? 'Reference' : audioModalTarget === 'cover_style' ? 'Style audio (blend)' : 'Cover'}
+                    {audioModalTarget === 'reference' ? t('create.audio_modal.reference_title') : audioModalTarget === 'cover_style' ? t('create.audio_modal.style_title') : t('create.audio_modal.cover_title')}
                   </h3>
                   <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
                     {audioModalTarget === 'reference'
-                      ? 'Create songs inspired by a reference track'
+                      ? t('create.audio_modal.reference_desc')
                       : audioModalTarget === 'cover_style'
-                        ? 'Second audio to blend with the source — style/timbre from this track'
-                        : 'Transform an existing track into a new version'}
+                        ? t('create.audio_modal.style_desc')
+                        : t('create.audio_modal.cover_desc')}
                   </p>
                 </div>
                 <button
@@ -2858,12 +2860,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 {isUploadingReference ? (
                   <>
                     <RefreshCw size={16} className="animate-spin" />
-                    Uploading...
+                    {t('common.loading')}
                   </>
                 ) : (
                   <>
                     <Upload size={16} />
-                    Upload audio
+                    {t('create.audio_modal.upload_btn')}
                     <span className="text-xs text-zinc-400 ml-1">MP3, WAV, FLAC</span>
                   </>
                 )}
@@ -2879,7 +2881,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="px-5 py-3 flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold">
-                    Library & uploads
+                    {t('create.audio_modal.library_uploads')}
                   </span>
                   <span className="text-[11px] text-zinc-400">(local)</span>
                   <button
@@ -2925,7 +2927,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 {isLoadingTracks ? (
                   <div className="px-5 py-8 text-center">
                     <RefreshCw size={20} className="animate-spin mx-auto text-zinc-400" />
-                    <p className="text-xs text-zinc-400 mt-2">Loading library...</p>
+                    <p className="text-xs text-zinc-400 mt-2">{t('common.loading')}</p>
                   </div>
                 ) : (() => {
                   const filtered = libraryTagFilter === 'all'
@@ -2935,7 +2937,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                     <div className="px-5 py-8 text-center">
                       <Music2 size={24} className="mx-auto text-zinc-300 dark:text-zinc-600" />
                       <p className="text-sm text-zinc-400 mt-2">
-                        {referenceTracks.length === 0 ? 'No tracks yet' : `No tracks with tag “${libraryTagFilter}”`}
+                        {referenceTracks.length === 0 ? t('create.audio_modal.no_tracks') : `No tracks with tag “${libraryTagFilter}”`}
                       </p>
                       <p className="text-xs text-zinc-400 mt-1">
                         {referenceTracks.length === 0 ? 'Upload audio or generate tracks to see them here' : 'Try “All” or another tag'}
@@ -3011,7 +3013,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                               onClick={() => useReferenceTrack(track)}
                               className="px-3 py-1.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
                             >
-                              Use
+                              {t('create.audio_modal.use')}
                             </button>
                             {track.source === 'uploaded' && (
                               <button
@@ -3075,12 +3077,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
           <Sparkles size={18} />
           <span>
             {createMode === 'lego'
-              ? 'Generate Lego track'
+              ? t('create.generate_button.lego')
               : createMode === 'cover'
-                ? 'Generate cover'
+                ? t('create.generate_button.cover')
                 : bulkCount > 1
-                ? `Create ${bulkCount} Jobs (${bulkCount * batchSize} tracks)`
-                : `Create${batchSize > 1 ? ` (${batchSize} variations)` : ''}`}
+                ? t('create.generate_button.bulk', { count: bulkCount, total: bulkCount * batchSize })
+                : t('create.generate_button.create') + (batchSize > 1 ? ` ${t('create.generate_button.variations', { count: batchSize })}` : '')}
           </span>
         </button>
       </div>

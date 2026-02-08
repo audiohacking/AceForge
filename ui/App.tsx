@@ -23,9 +23,11 @@ import { TrainingPanel } from './components/TrainingPanel';
 import { StemSplittingPanel } from './components/StemSplittingPanel';
 import { VoiceCloningPanel } from './components/VoiceCloningPanel';
 import { MidiPanel } from './components/MidiPanel';
+import { useTranslation } from 'react-i18next';
 
 
 export default function App() {
+  const { t } = useTranslation();
   // Responsive
   const { isMobile, isDesktop } = useResponsive();
 
@@ -436,9 +438,9 @@ export default function App() {
       if (audio.error && audio.error.code !== 1) {
         console.error("Audio playback error:", audio.error);
         if (audio.error.code === 4) {
-          showToast('This song is no longer available.', 'error');
+          showToast(t('app.song_unavailable'), 'error');
         } else {
-          showToast('Unable to play this song.', 'error');
+          showToast(t('app.unable_to_play'), 'error');
         }
       }
       setIsPlaying(false);
@@ -476,7 +478,7 @@ export default function App() {
         if (err instanceof Error && err.name !== 'AbortError') {
           console.error("Playback failed:", err);
           if (err.name === 'NotSupportedError') {
-            showToast('This song is no longer available.', 'error');
+            showToast(t('app.song_unavailable'), 'error');
           }
           setIsPlaying(false);
         }
@@ -725,7 +727,7 @@ export default function App() {
         if (activeJobsRef.current.has(job.jobId)) {
           console.warn(`Job ${job.jobId} timed out`);
           cleanupJob(job.jobId, tempId);
-          showToast('Generation timed out', 'error');
+          showToast(t('app.generation_timed_out'), 'error');
         }
       }, 600000);
 
@@ -736,7 +738,7 @@ export default function App() {
       if (activeJobsRef.current.size === 0) {
         setIsGenerating(false);
       }
-      const msg = e instanceof Error ? e.message : 'Generation failed. Please try again.';
+      const msg = e instanceof Error ? e.message : t('app.generation_failed', { error: 'Unknown' });
       showToast(msg, 'error');
     }
   };
@@ -839,7 +841,7 @@ export default function App() {
   const handleDeleteSong = async (song: Song) => {
     // Show confirmation dialog
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${song.title}"? This action cannot be undone.`
+      t('app.confirm_delete_song', { title: song.title })
     );
 
     if (!confirmed) return;
@@ -876,10 +878,10 @@ export default function App() {
       // Remove from play queue if present
       setPlayQueue(prev => prev.filter(s => s.id !== song.id));
 
-      showToast('Song deleted successfully');
+      showToast(t('app.song_deleted_success'));
     } catch (error) {
       console.error('Failed to delete song:', error);
-      showToast('Failed to delete song', 'error');
+      showToast(t('app.delete_song_failed'), 'error');
     }
   };
 
@@ -893,10 +895,10 @@ export default function App() {
         setSongToAddToPlaylist(null);
         playlistsApi.getMyPlaylists(token ?? undefined).then(r => setPlaylists(r.playlists));
       }
-      showToast('Playlist created successfully!');
+      showToast(t('app.playlist_created_success'));
     } catch (error) {
       console.error('Create playlist error:', error);
-      showToast('Failed to create playlist', 'error');
+      showToast(t('app.playlist_create_failed'), 'error');
     }
   };
 
@@ -910,11 +912,11 @@ export default function App() {
     try {
       await playlistsApi.addSong(playlistId, songToAddToPlaylist.id, token ?? '');
       setSongToAddToPlaylist(null);
-      showToast('Song added to playlist');
+      showToast(t('app.song_added_to_playlist'));
       playlistsApi.getMyPlaylists(token ?? undefined).then(r => setPlaylists(r.playlists));
     } catch (error) {
       console.error('Add song error:', error);
-      showToast('Failed to add song to playlist', 'error');
+      showToast(t('app.add_song_failed'), 'error');
     }
   };
 
@@ -1083,7 +1085,7 @@ export default function App() {
                 onClick={() => setMobileShowList(!mobileShowList)}
                 className="bg-zinc-800 text-white px-4 py-2 rounded-full shadow-lg border border-white/10 flex items-center gap-2 text-sm font-bold"
               >
-                {mobileShowList ? 'Tools' : 'View List'}
+                {mobileShowList ? t('common.tools') : t('common.view_list')}
                 <List size={16} />
               </button>
             </div>
@@ -1160,7 +1162,7 @@ export default function App() {
                 onClick={() => setMobileShowList(!mobileShowList)}
                 className="bg-zinc-800 text-white px-4 py-2 rounded-full shadow-lg border border-white/10 flex items-center gap-2 text-sm font-bold"
               >
-                {mobileShowList ? 'Create Song' : 'View List'}
+                {mobileShowList ? t('app.create_song') : t('common.view_list')}
                 <List size={16} />
               </button>
             </div>

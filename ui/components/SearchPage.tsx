@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Play, Pause, Heart, ChevronRight, ChevronLeft, Copy, Check, X, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Song, Playlist } from '../types';
 import { songsApi, usersApi, playlistsApi, searchApi, UserProfile, getAudioUrl } from '../services/api';
 
@@ -36,6 +37,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   onNavigateToSong,
   onNavigateToPlaylist,
 }) => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [featuredSongs, setFeaturedSongs] = useState<ExtendedSong[]>([]);
   const [featuredCreators, setFeaturedCreators] = useState<Array<UserProfile & { song_count?: number }>>([]);
@@ -210,7 +212,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={20} />
             <input
               type="text"
-              placeholder="Search for songs, playlists, creators, or genres"
+              placeholder={t('search.placeholder')}
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full h-11 pl-12 pr-12 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-white/10 rounded-full text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
@@ -232,7 +234,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
         <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-              {isSearching ? `Songs matching "${searchQuery}"` : 'Featured Songs'}
+              {isSearching ? t('search.songs_matching', { query: searchQuery }) : t('search.featured_songs')}
               {isSearching && displaySongs.length > 0 && (
                 <span className="ml-2 text-sm font-normal text-zinc-500">({displaySongs.length})</span>
               )}
@@ -278,7 +280,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             </div>
           ) : isSearching ? (
             <div className="text-center py-8 text-zinc-500 text-sm">
-              No songs found matching "{searchQuery}"
+              {t('search.no_songs_found', { query: searchQuery })}
             </div>
           ) : null}
         </section>
@@ -287,7 +289,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
         <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-              {isSearching ? `Creators matching "${searchQuery}"` : 'Featured Creators'}
+              {isSearching ? t('search.creators_matching', { query: searchQuery }) : t('search.featured_creators')}
               {isSearching && displayCreators.length > 0 && (
                 <span className="ml-2 text-sm font-normal text-zinc-500">({displayCreators.length})</span>
               )}
@@ -337,7 +339,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             </div>
           ) : (
             <div className="text-center py-8 text-zinc-500 text-sm">
-              {isSearching ? `No creators found matching "${searchQuery}"` : 'No creators yet. Be the first to share your music!'}
+              {isSearching ? t('search.no_creators_found', { query: searchQuery }) : t('search.no_creators_yet')}
             </div>
           )}
         </section>
@@ -346,7 +348,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
         <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-              {isSearching ? `Playlists matching "${searchQuery}"` : 'Featured Playlists'}
+              {isSearching ? t('search.playlists_matching', { query: searchQuery }) : t('search.featured_playlists')}
               {isSearching && displayPlaylists.length > 0 && (
                 <span className="ml-2 text-sm font-normal text-zinc-500">({displayPlaylists.length})</span>
               )}
@@ -398,24 +400,23 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             </div>
           ) : (
             <div className="text-center py-8 text-zinc-500 text-sm">
-              {isSearching ? `No playlists found matching "${searchQuery}"` : 'No public playlists yet. Create one and share your favorites!'}
+              {isSearching ? t('search.no_playlists_found', { query: searchQuery }) : t('search.no_playlists_yet')}
             </div>
           )}
         </section>
 
         {/* Genres */}
         <section className="mb-10">
-          <h2 className="text-lg font-bold text-zinc-900 dark:text-white mb-4">Genres</h2>
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-white mb-4">{t('search.genres')}</h2>
           <div className="flex flex-wrap gap-2">
             {GENRES.map((genre) => (
               <button
                 key={genre}
                 onClick={() => handleGenreClick(genre)}
-                className={`px-3 py-1.5 border rounded-full text-sm transition-all duration-200 group flex items-center gap-1.5 ${
-                  searchQuery === genre
-                    ? 'bg-pink-500 border-pink-500 text-white'
-                    : 'bg-zinc-100 dark:bg-zinc-800/60 border-zinc-200 dark:border-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700/60 hover:border-pink-500/30 hover:text-pink-600 dark:hover:text-pink-400'
-                }`}
+                className={`px-3 py-1.5 border rounded-full text-sm transition-all duration-200 group flex items-center gap-1.5 ${searchQuery === genre
+                  ? 'bg-pink-500 border-pink-500 text-white'
+                  : 'bg-zinc-100 dark:bg-zinc-800/60 border-zinc-200 dark:border-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700/60 hover:border-pink-500/30 hover:text-pink-600 dark:hover:text-pink-400'
+                  }`}
               >
                 {genre}
                 <Copy

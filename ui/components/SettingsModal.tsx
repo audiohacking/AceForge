@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github, FolderOpen, HardDrive, ZoomIn, Box } from 'lucide-react';
+import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github, FolderOpen, HardDrive, ZoomIn, Box, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { EditProfileModal } from './EditProfileModal';
 import { preferencesApi, aceStepModelsApi } from '../services/api';
 import type { AceStepDownloadStatus } from '../services/api';
+import { useTranslation } from 'react-i18next';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -34,6 +35,7 @@ const ACE_STEP_LM_OPTIONS = [
 ] as const;
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, onToggleTheme, onNavigateToProfile }) => {
+    const { t, i18n } = useTranslation();
     const { user } = useAuth();
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [modelsFolder, setModelsFolder] = useState('');
@@ -133,6 +135,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
             .catch(() => {});
     };
 
+    const toggleLanguage = (lang: string) => {
+        i18n.changeLanguage(lang);
+    };
+
     if (!isOpen || !user) {
         if (isEditProfileOpen && user) {
             return (
@@ -154,7 +160,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
             >
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-white/5">
-                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Settings</h2>
+                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">{t('settings.title')}</h2>
                     <button
                         onClick={onClose}
                         className="p-2 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full transition-colors"
@@ -164,23 +170,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                 </div>
 
                 <div className="p-6 space-y-8">
+
+                    {/* Language Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <Globe size={20} />
+                            <h3 className="font-semibold">{t('settings.language')}</h3>
+                        </div>
+                        <div className="pl-7 space-y-3">
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => toggleLanguage('en')}
+                                    className={`flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-colors ${i18n.language.startsWith('en')
+                                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                            : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600'
+                                        }`}
+                                >
+                                    English
+                                </button>
+                                <button
+                                    onClick={() => toggleLanguage('zh')}
+                                    className={`flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-colors ${i18n.language.startsWith('zh')
+                                            ? 'border-indigo-500 bg-indigo-950 text-indigo-300'
+                                            : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600'
+                                        }`}
+                                >
+                                    中文
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* AceForge paths (models, output) */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
                             <HardDrive size={20} />
-                            <h3 className="font-semibold">Paths</h3>
+                            <h3 className="font-semibold">{t('settings.paths')}</h3>
                         </div>
                         <div className="pl-7 space-y-4">
                             <div>
-                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Models folder</label>
-                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Where ACE-Step and other models are stored. Leave blank for app default. Change takes effect immediately.</p>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">{t('settings.models_folder')}</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">{t('settings.models_folder_desc')}</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
                                         value={modelsFolder}
                                         onChange={(e) => setModelsFolder(e.target.value)}
                                         onBlur={saveModelsFolder}
-                                        placeholder="Default (app data folder)"
+                                        placeholder={t('settings.default_placeholder')}
                                         className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
                                     />
                                     <button
@@ -188,20 +225,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                         onClick={saveModelsFolder}
                                         className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600"
                                     >
-                                        {modelsFolderSaved ? 'Saved' : 'Save'}
+                                        {modelsFolderSaved ? t('settings.saved') : t('settings.save')}
                                     </button>
                                 </div>
                             </div>
                             <div>
-                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Output directory</label>
-                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Where generated tracks, stems, voice clones, and MIDI are saved. Leave blank for app default.</p>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">{t('settings.output_dir')}</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">{t('settings.output_dir_desc')}</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
                                         value={outputDir}
                                         onChange={(e) => setOutputDir(e.target.value)}
                                         onBlur={saveOutputDir}
-                                        placeholder="Default (app data folder)"
+                                        placeholder={t('settings.default_placeholder')}
                                         className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
                                     />
                                     <button
@@ -209,7 +246,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                         onClick={saveOutputDir}
                                         className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600"
                                     >
-                                        {outputDirSaved ? 'Saved' : 'Save'}
+                                        {outputDirSaved ? t('settings.saved') : t('settings.save')}
                                     </button>
                                 </div>
                             </div>
@@ -220,14 +257,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
                             <Box size={20} />
-                            <h3 className="font-semibold">Models</h3>
+                            <h3 className="font-semibold">{t('settings.models')}</h3>
                         </div>
                         <div className="pl-7 space-y-4">
                             <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">
-                                ACE-Step executor (DiT) and planner (LM). See Tutorial for VRAM and quality trade-offs.
+                                {t('settings.models_desc')}
                             </p>
                             <div>
-                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Current ACE-Step model</label>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">{t('settings.current_model')}</label>
                                 <p className="text-sm text-zinc-900 dark:text-white font-medium">
                                     {(() => {
                                         const discovered = aceStepList?.discovered_models ?? [];
@@ -240,8 +277,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                 </p>
                             </div>
                             <div>
-                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">ACE-Step (DiT) model</label>
-                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Installed and discovered models in the checkpoints folder. Custom models appear when placed there.</p>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">{t('settings.dit_model')}</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">{t('settings.dit_model_desc')}</p>
                                 <select
                                     value={aceStepList?.dit_models.some((m) => m.id === aceStepDitModel && m.installed) || (aceStepList?.discovered_models ?? []).some((d) => d.id === aceStepDitModel) ? aceStepDitModel : (aceStepList?.dit_models.find((m) => m.installed)?.id ?? aceStepList?.discovered_models?.[0]?.id ?? 'turbo')}
                                     onChange={(e) => saveAceStepModels(e.target.value, undefined)}
@@ -268,8 +305,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                 </select>
                             </div>
                             <div>
-                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">LM planner</label>
-                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Bundled ACE-Step 5Hz LM (no external LLM). Used when &quot;Thinking&quot; is on in Create. Download the model below if needed; only installed options appear here.</p>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">{t('settings.lm_planner')}</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">{t('settings.lm_planner_desc')}</p>
                                 <select
                                     value={aceStepList?.lm_models.some((m) => m.id === aceStepLm && m.installed) ? aceStepLm : (aceStepList?.lm_models.find((m) => m.installed)?.id ?? 'none')}
                                     onChange={(e) => saveAceStepModels(undefined, e.target.value)}
@@ -283,14 +320,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                         : <option value="none">Loading…</option>}
                                 </select>
                             </div>
-                            {modelsSaved && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
+                            {modelsSaved && <span className="text-xs text-green-600 dark:text-green-400">{t('settings.saved')}</span>}
                             {/* Download models */}
                             {aceStepList && (
                                 <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-white/5">
-                                    <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-2">Download models</label>
+                                    <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-2">{t('settings.download_models')}</label>
                                     <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">
                                         {aceStepList.acestep_download_available
-                                            ? 'Download DiT or LM models into the checkpoints folder. (Bundled in app.)'
+                                            ? t('settings.download_models_desc')
                                             : 'Downloader not available in this build. Default (Turbo) uses the app download.'}
                                     </p>
                                     {downloadError && <p className="text-xs text-red-600 dark:text-red-400 mb-2">{downloadError}</p>}
@@ -308,7 +345,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                                     }}
                                                     className="text-xs px-2 py-1 rounded bg-red-500/90 text-white hover:bg-red-600"
                                                 >
-                                                    Cancel
+                                                    {t('common.cancel')}
                                                 </button>
                                             </div>
                                             <div className="h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
@@ -413,12 +450,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
                             <ZoomIn size={20} />
-                            <h3 className="font-semibold">Display</h3>
+                            <h3 className="font-semibold">{t('settings.display')}</h3>
                         </div>
                         <div className="pl-7 space-y-3">
                             <div>
-                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">UI zoom</label>
-                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Window zoom level. Takes effect on next app launch.</p>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">{t('settings.ui_zoom')}</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">{t('settings.ui_zoom_desc')}</p>
                                 <div className="flex flex-wrap gap-2 items-center">
                                     {ZOOM_OPTIONS.map((pct) => (
                                         <button
@@ -438,7 +475,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                             {pct}%
                                         </button>
                                     ))}
-                                    {uiZoomSaved && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
+                                    {uiZoomSaved && <span className="text-xs text-green-600 dark:text-green-400">{t('settings.saved')}</span>}
                                 </div>
                             </div>
                         </div>
@@ -457,7 +494,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                             <div className="flex-1">
                                 <h3 className="text-xl font-bold text-zinc-900 dark:text-white">@{user.username}</h3>
                                 <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
-                                    Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                                    {t('settings.member_since')} {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                                 </p>
                             </div>
                             <div className="flex gap-2">
@@ -469,7 +506,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
                                 >
                                     <Edit3 size={16} />
-                                    Edit Profile
+                                    {t('settings.edit_profile')}
                                 </button>
                                 <button
                                     onClick={() => {
@@ -479,7 +516,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                     className="flex items-center gap-2 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white rounded-lg text-sm font-medium hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
                                 >
                                     <ExternalLink size={16} />
-                                    View Profile
+                                    {t('settings.view_profile')}
                                 </button>
                             </div>
                         </div>
@@ -489,43 +526,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
                             <UserIcon size={20} />
-                            <h3 className="font-semibold">Account</h3>
+                            <h3 className="font-semibold">{t('settings.account')}</h3>
                         </div>
                         <div className="pl-7 space-y-3">
                             <div>
-                                <label className="text-sm text-zinc-500 dark:text-zinc-400">Username</label>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400">{t('settings.username')}</label>
                                 <p className="text-zinc-900 dark:text-white font-medium">@{user.username}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Output directory (global for generation, stems, voice clone, MIDI) */}
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
-                            <FolderOpen size={20} />
-                            <h3 className="font-semibold">Output</h3>
-                        </div>
-                        <div className="pl-7 space-y-3">
-                            <div>
-                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Output directory</label>
-                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Where generated tracks, stems, voice clones, and MIDI are saved. Leave blank for app default.</p>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={outputDir}
-                                        onChange={(e) => setOutputDir(e.target.value)}
-                                        onBlur={saveOutputDir}
-                                        placeholder="Default (app data folder)"
-                                        className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={saveOutputDir}
-                                        className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600"
-                                    >
-                                        {outputDirSaved ? 'Saved' : 'Save'}
-                                    </button>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -534,7 +540,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
                             <Palette size={20} />
-                            <h3 className="font-semibold">Appearance</h3>
+                            <h3 className="font-semibold">{t('settings.appearance')}</h3>
                         </div>
                         <div className="pl-7 space-y-3">
                             <div className="flex gap-3">
@@ -545,7 +551,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                             : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600'
                                         }`}
                                 >
-                                    Light
+                                    {t('common.light')}
                                 </button>
                                 <button
                                     onClick={theme === 'light' ? onToggleTheme : undefined}
@@ -554,7 +560,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                             : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600'
                                         }`}
                                 >
-                                    Dark
+                                    {t('common.dark')}
                                 </button>
                             </div>
                         </div>
@@ -564,13 +570,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
                             <Info size={20} />
-                            <h3 className="font-semibold">About</h3>
+                            <h3 className="font-semibold">{t('settings.about')}</h3>
                         </div>
                         <div className="pl-7 space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
-                            <p>Version 1.0.0</p>
+                            <p>{t('settings.version')} 1.0.0</p>
                             <p>AceForge</p>
                             <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
-                                Powered by ACE-Step 1.5. Open source and free to use.
+                                {t('settings.powered_by')}
                             </p>
                             <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700/50 mt-4">
                                 <p className="text-zinc-900 dark:text-white font-medium mb-3">AceForge</p>
@@ -582,11 +588,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                         className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 dark:bg-zinc-700 text-white rounded-lg text-sm font-medium hover:bg-zinc-700 dark:hover:bg-zinc-600 transition-colors"
                                     >
                                         <Github size={16} />
-                                        GitHub Repo
+                                        {t('settings.github_repo')}
                                     </a>
                                 </div>
                                 <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-3">
-                                    Report issues or request features on GitHub
+                                    {t('settings.report_issues')}
                                 </p>
                             </div>
                         </div>
@@ -599,7 +605,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                         onClick={onClose}
                         className="px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
                     >
-                        Done
+                        {t('settings.done')}
                     </button>
                 </div>
             </div>

@@ -1,26 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Download, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toolsApi, preferencesApi } from '../services/api';
 
 const MODEL_POLL_MS = 800;
 
-const LANGUAGES = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'fr', label: 'French' },
-  { value: 'de', label: 'German' },
-  { value: 'it', label: 'Italian' },
-  { value: 'pt', label: 'Portuguese' },
-  { value: 'pl', label: 'Polish' },
-  { value: 'tr', label: 'Turkish' },
-  { value: 'ru', label: 'Russian' },
-  { value: 'nl', label: 'Dutch' },
-  { value: 'cs', label: 'Czech' },
-  { value: 'ar', label: 'Arabic' },
-  { value: 'zh-cn', label: 'Chinese (Simplified)' },
-  { value: 'ja', label: 'Japanese' },
-  { value: 'hu', label: 'Hungarian' },
-  { value: 'ko', label: 'Korean' },
+const LANGUAGE_KEYS = [
+  { value: 'en', key: 'lang_en' },
+  { value: 'es', key: 'lang_es' },
+  { value: 'fr', key: 'lang_fr' },
+  { value: 'de', key: 'lang_de' },
+  { value: 'it', key: 'lang_it' },
+  { value: 'pt', key: 'lang_pt' },
+  { value: 'pl', key: 'lang_pl' },
+  { value: 'tr', key: 'lang_tr' },
+  { value: 'ru', key: 'lang_ru' },
+  { value: 'nl', key: 'lang_nl' },
+  { value: 'cs', key: 'lang_cs' },
+  { value: 'ar', key: 'lang_ar' },
+  { value: 'zh-cn', key: 'lang_zh' },
+  { value: 'ja', key: 'lang_ja' },
+  { value: 'hu', key: 'lang_hu' },
+  { value: 'ko', key: 'lang_ko' },
 ];
 
 interface VoiceCloningPanelProps {
@@ -28,6 +29,7 @@ interface VoiceCloningPanelProps {
 }
 
 export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUpdated }) => {
+  const { t } = useTranslation();
   const [text, setText] = useState('');
   const [speakerFile, setSpeakerFile] = useState<File | null>(null);
   const [outputFilename, setOutputFilename] = useState('voice_clone_output');
@@ -75,14 +77,14 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
           setModelState(r.state || '');
           setModelMessage(r.message || '');
         })
-        .catch(() => {});
+        .catch(() => { });
       toolsApi.getProgress()
         .then((p) => {
           if (p.stage === 'voice_clone_model_download') {
             setModelDownloadProgress(p.fraction);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     poll();
     modelPollRef.current = setInterval(poll, MODEL_POLL_MS);
@@ -99,14 +101,14 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
         if (v?.device_preference != null) setDevice(String(v.device_preference));
         if (v?.output_filename != null) setOutputFilename(String(v.output_filename));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleDownloadModels = () => {
     setError(null);
     toolsApi.voiceCloneModelEnsure().then(() => {
       setModelState('downloading');
-      setModelMessage('Downloading XTTS voice cloning model (first use only). This may take several minutes.');
+      setModelMessage(t('voice_cloning.downloading_model'));
     }).catch((e) => setError(e.message));
   };
 
@@ -116,21 +118,21 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
     setSuccess(null);
     if (modelReady !== true || modelState === 'downloading') {
       setError(modelState === 'downloading'
-        ? 'Please wait for the voice cloning model download to finish.'
-        : 'Voice cloning model is not ready. Click "Download voice cloning model" first.');
+        ? t('voice_cloning.error_wait_download')
+        : t('voice_cloning.error_model_not_ready'));
       return;
     }
     if (!(text || '').trim()) {
-      setError('Text to synthesize is required.');
+      setError(t('voice_cloning.error_text_required'));
       return;
     }
     if (!speakerFile) {
-      setError('Reference audio file is required.');
+      setError(t('voice_cloning.error_reference_required'));
       return;
     }
     const out = (outputFilename || 'voice_clone_output').trim();
     if (!out) {
-      setError('Output filename is required.');
+      setError(t('voice_cloning.error_filename_required'));
       return;
     }
     const formData = new FormData();
@@ -152,7 +154,7 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
       if (prefs.output_dir) formData.set('out_dir', prefs.output_dir);
       const res = await toolsApi.voiceClone(formData);
       if (res?.error) {
-        setError(res.message || 'Voice cloning failed.');
+        setError(res.message || t('voice_cloning.error_failed'));
         setLoading(false);
         return;
       }
@@ -163,10 +165,10 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
           output_filename: out.endsWith('.mp3') || out.endsWith('.wav') ? out : `${out}.mp3`,
         },
       });
-      setSuccess(res?.message || 'Voice cloning completed!');
+      setSuccess(res?.message || t('voice_cloning.success_message'));
       onTracksUpdated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Voice cloning failed.');
+      setError(err instanceof Error ? err.message : t('voice_cloning.error_failed'));
     }
     setLoading(false);
   };
@@ -175,29 +177,29 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
     <div className="h-full flex flex-col overflow-y-auto p-4 text-zinc-800 dark:text-zinc-200">
       <div className="flex items-center gap-2 mb-4">
         <Mic className="w-6 h-6 text-pink-500" />
-        <h2 className="text-lg font-semibold">Voice Cloning</h2>
+        <h2 className="text-lg font-semibold">{t('voice_cloning.title')}</h2>
       </div>
       <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-        Clone a voice from a reference audio file using XTTS v2. Upload a reference and enter text to synthesize.
+        {t('voice_cloning.description')}
       </p>
 
       {modelReady === false && modelState !== 'downloading' && (
         <div className="mb-4 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
-          <p className="font-medium mb-1">Voice cloning model is not downloaded yet.</p>
-          <p className="mb-2">{modelMessage || 'Click "Download voice cloning model" to download it (first use only).'}</p>
+          <p className="font-medium mb-1">{t('voice_cloning.model_not_downloaded')}</p>
+          <p className="mb-2">{t('voice_cloning.model_download_hint')}</p>
           <button
             type="button"
             onClick={handleDownloadModels}
             className="inline-flex items-center gap-1 rounded-lg bg-amber-500 text-white px-3 py-1.5 text-sm font-medium hover:bg-amber-600"
           >
-            <Download size={14} /> Download voice cloning model
+            <Download size={14} /> {t('voice_cloning.download_model')}
           </button>
         </div>
       )}
       {modelState === 'downloading' && (
         <div className="mb-4 p-3 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm">
           <p className="font-medium mb-2 flex items-center gap-2">
-            <Loader2 size={16} className="animate-spin" /> Downloading XTTS voice cloning model…
+            <Loader2 size={16} className="animate-spin" /> {t('voice_cloning.downloading_model')}
           </p>
           <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
             <div
@@ -216,19 +218,19 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Text to Synthesize</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.text_to_synthesize')}</label>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={4}
-            placeholder="Enter the text you want to synthesize in the cloned voice..."
+            placeholder={t('voice_cloning.text_placeholder')}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Reference Audio File</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.reference_audio')}</label>
           <input
             type="file"
             accept="audio/*,.mp3,.wav,.m4a,.flac"
@@ -239,7 +241,7 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Output filename</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.output_filename')}</label>
           <input
             type="text"
             value={outputFilename}
@@ -251,33 +253,33 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Language</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.language')}</label>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           >
-            {LANGUAGES.map((l) => (
-              <option key={l.value} value={l.value}>{l.label}</option>
+            {LANGUAGE_KEYS.map((l) => (
+              <option key={l.value} value={l.value}>{t(`voice_cloning.${l.key}`)}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Device</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.device')}</label>
           <select
             value={device}
             onChange={(e) => setDevice(e.target.value)}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           >
-            <option value="auto">Auto (MPS if available, else CPU)</option>
-            <option value="mps">Apple Silicon GPU (MPS)</option>
-            <option value="cpu">CPU</option>
+            <option value="auto">{t('stem_splitting.device_auto')}</option>
+            <option value="mps">{t('stem_splitting.device_mps')}</option>
+            <option value="cpu">{t('stem_splitting.device_cpu')}</option>
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Temperature: {temperature}</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.temperature')}: {temperature}</label>
           <input
             type="range"
             min={0}
@@ -290,7 +292,7 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Length Penalty: {lengthPenalty}</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.length_penalty')}: {lengthPenalty}</label>
           <input
             type="range"
             min={0}
@@ -303,7 +305,7 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Repetition Penalty: {repetitionPenalty}</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.repetition_penalty')}: {repetitionPenalty}</label>
           <input
             type="range"
             min={0}
@@ -316,7 +318,7 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Top-K</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.top_k')}</label>
           <input
             type="number"
             min={1}
@@ -328,7 +330,7 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Top-P: {topP}</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.top_p')}: {topP}</label>
           <input
             type="range"
             min={0}
@@ -341,7 +343,7 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Speed: {speed}</label>
+          <label className="block text-sm font-medium mb-1">{t('voice_cloning.speed')}: {speed}</label>
           <input
             type="range"
             min={0.25}
@@ -359,7 +361,7 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
             checked={enableTextSplitting}
             onChange={(e) => setEnableTextSplitting(e.target.checked)}
           />
-          <span className="text-sm">Enable Text Splitting</span>
+          <span className="text-sm">{t('voice_cloning.enable_text_splitting')}</span>
         </label>
 
         <button
@@ -368,11 +370,11 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
           className="rounded-lg bg-pink-500 text-white px-4 py-2 text-sm font-medium hover:bg-pink-600 disabled:opacity-50"
         >
           {modelState === 'downloading' ? (
-            <><Loader2 size={16} className="animate-spin inline mr-1" /> Downloading model…</>
+            <><Loader2 size={16} className="animate-spin inline mr-1" /> {t('voice_cloning.downloading')}</>
           ) : loading ? (
-            'Cloning…'
+            t('voice_cloning.cloning')
           ) : (
-            'Clone Voice'
+            t('voice_cloning.clone_voice')
           )}
         </button>
       </form>

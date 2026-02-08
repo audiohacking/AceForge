@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Layers, Download, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toolsApi, preferencesApi } from '../services/api';
 
 const POLL_INTERVAL_MS = 500;
@@ -10,6 +11,7 @@ interface StemSplittingPanelProps {
 }
 
 export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracksUpdated }) => {
+  const { t } = useTranslation();
   const [inputFile, setInputFile] = useState<File | null>(null);
   const [baseFilename, setBaseFilename] = useState('');
   const [stemCount, setStemCount] = useState('4');
@@ -46,7 +48,7 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
         if (s?.device_preference != null) setDevice(s.device_preference);
         if (s?.export_format != null) setExportFormat(s.export_format);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -65,14 +67,14 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
           setModelState(r.state || '');
           setModelMessage(r.message || '');
         })
-        .catch(() => {});
+        .catch(() => { });
       toolsApi.getProgress()
         .then((p) => {
           if (p.stage === 'stem_split_model_download') {
             setModelDownloadProgress(p.fraction);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     poll();
     modelPollRef.current = setInterval(poll, MODEL_POLL_MS);
@@ -95,7 +97,7 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
             }
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     poll();
     pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
@@ -108,7 +110,7 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
     setError(null);
     toolsApi.stemSplitModelEnsure().then(() => {
       setModelState('downloading');
-      setModelMessage('Downloading Demucs model (first use only). This may take several minutes.');
+      setModelMessage(t('stem_splitting.downloading_demucs'));
     }).catch((e) => setError(e.message));
   };
 
@@ -117,11 +119,11 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
     setError(null);
     setSuccess(null);
     if (!inputFile) {
-      setError('Please select an input audio file.');
+      setError(t('stem_splitting.error_select_file'));
       return;
     }
     if (modelReady !== true || modelState === 'downloading') {
-      setError(modelState === 'downloading' ? 'Please wait for Demucs model download to finish.' : 'Demucs model is not ready. Click Download Demucs models first.');
+      setError(modelState === 'downloading' ? t('stem_splitting.error_wait_download') : t('stem_splitting.error_model_not_ready'));
       return;
     }
     const formData = new FormData();
@@ -138,16 +140,16 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
       if (prefs.output_dir) formData.set('out_dir', prefs.output_dir);
       const res = await toolsApi.stemSplit(formData);
       if (res?.error) {
-        setError(res.message || 'Stem splitting failed.');
+        setError(res.message || t('stem_splitting.error_failed'));
         setLoading(false);
         return;
       }
       await preferencesApi.update({ stem_split: { stem_count: stemCount, mode, device_preference: device, export_format: exportFormat } });
-      setSuccess(res?.message || 'Stems saved to output directory.');
+      setSuccess(res?.message || t('stem_splitting.success_message'));
       setLoading(false);
       onTracksUpdated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Stem splitting failed.');
+      setError(err instanceof Error ? err.message : t('stem_splitting.error_failed'));
       setLoading(false);
     }
   };
@@ -156,29 +158,29 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
     <div className="h-full flex flex-col overflow-y-auto p-4 text-zinc-800 dark:text-zinc-200">
       <div className="flex items-center gap-2 mb-4">
         <Layers className="w-6 h-6 text-pink-500" />
-        <h2 className="text-lg font-semibold">Stem Splitting</h2>
+        <h2 className="text-lg font-semibold">{t('stem_splitting.title')}</h2>
       </div>
       <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-        Split audio into separate stems (vocals, drums, bass, etc.) using Demucs. Upload an audio file and choose the number of stems.
+        {t('stem_splitting.description')}
       </p>
 
       {modelReady === false && modelState !== 'downloading' && (
         <div className="mb-4 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
-          <p className="font-medium mb-1">Demucs model is not downloaded yet.</p>
-          <p className="mb-2">{modelMessage || 'Click "Download Demucs models" to download it (first use only).'}</p>
+          <p className="font-medium mb-1">{t('stem_splitting.model_not_downloaded')}</p>
+          <p className="mb-2">{t('stem_splitting.model_download_hint')}</p>
           <button
             type="button"
             onClick={handleDownloadModels}
             className="inline-flex items-center gap-1 rounded-lg bg-amber-500 text-white px-3 py-1.5 text-sm font-medium hover:bg-amber-600"
           >
-            <Download size={14} /> Download Demucs models
+            <Download size={14} /> {t('stem_splitting.download_demucs')}
           </button>
         </div>
       )}
       {modelState === 'downloading' && (
         <div className="mb-4 p-3 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm">
           <p className="font-medium mb-2 flex items-center gap-2">
-            <Loader2 size={16} className="animate-spin" /> Downloading Demucs model…
+            <Loader2 size={16} className="animate-spin" /> {t('stem_splitting.downloading_demucs')}
           </p>
           <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
             <div
@@ -197,7 +199,7 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Input Audio File</label>
+          <label className="block text-sm font-medium mb-1">{t('stem_splitting.input_audio')}</label>
           <input
             type="file"
             accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg"
@@ -207,64 +209,64 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Base filename (optional)</label>
+          <label className="block text-sm font-medium mb-1">{t('stem_splitting.base_filename')}</label>
           <input
             type="text"
             value={baseFilename}
             onChange={(e) => setBaseFilename(e.target.value)}
-            placeholder="Prefix for output filenames"
+            placeholder={t('stem_splitting.base_filename_placeholder')}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Number of Stems</label>
+          <label className="block text-sm font-medium mb-1">{t('stem_splitting.stem_count')}</label>
           <select
             value={stemCount}
             onChange={(e) => setStemCount(e.target.value)}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           >
-            <option value="2">2-Stem (Vocals / Instrumental)</option>
-            <option value="4">4-Stem (Vocals, Drums, Bass, Other)</option>
-            <option value="6">6-Stem (Vocals, Drums, Bass, Guitar, Piano, Other)</option>
+            <option value="2">{t('stem_splitting.stem_2')}</option>
+            <option value="4">{t('stem_splitting.stem_4')}</option>
+            <option value="6">{t('stem_splitting.stem_6')}</option>
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Mode (2-Stem only)</label>
+          <label className="block text-sm font-medium mb-1">{t('stem_splitting.mode')}</label>
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value)}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           >
-            <option value="">Standard (All Stems)</option>
-            <option value="vocals_only">Acapella (Vocals Only)</option>
-            <option value="instrumental">Instrumental / Karaoke</option>
+            <option value="">{t('stem_splitting.mode_standard')}</option>
+            <option value="vocals_only">{t('stem_splitting.mode_vocals')}</option>
+            <option value="instrumental">{t('stem_splitting.mode_instrumental')}</option>
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Device</label>
+          <label className="block text-sm font-medium mb-1">{t('stem_splitting.device')}</label>
           <select
             value={device}
             onChange={(e) => setDevice(e.target.value)}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           >
-            <option value="auto">Auto (MPS if available, else CPU)</option>
-            <option value="mps">Apple Silicon GPU (MPS)</option>
-            <option value="cpu">CPU</option>
+            <option value="auto">{t('stem_splitting.device_auto')}</option>
+            <option value="mps">{t('stem_splitting.device_mps')}</option>
+            <option value="cpu">{t('stem_splitting.device_cpu')}</option>
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Export Format</label>
+          <label className="block text-sm font-medium mb-1">{t('stem_splitting.export_format')}</label>
           <select
             value={exportFormat}
             onChange={(e) => setExportFormat(e.target.value)}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           >
-            <option value="wav">WAV (Uncompressed)</option>
-            <option value="mp3">MP3 (256kbps)</option>
+            <option value="wav">{t('stem_splitting.format_wav')}</option>
+            <option value="mp3">{t('stem_splitting.format_mp3')}</option>
           </select>
         </div>
 
@@ -283,11 +285,11 @@ export const StemSplittingPanel: React.FC<StemSplittingPanelProps> = ({ onTracks
           className="rounded-lg bg-pink-500 text-white px-4 py-2 text-sm font-medium hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
         >
           {modelState === 'downloading' ? (
-            <><Loader2 size={16} className="animate-spin" /> Downloading Demucs models…</>
+            <><Loader2 size={16} className="animate-spin" /> {t('stem_splitting.downloading_demucs')}</>
           ) : loading ? (
-            <><Loader2 size={16} className="animate-spin" /> Splitting…</>
+            <><Loader2 size={16} className="animate-spin" /> {t('stem_splitting.splitting')}</>
           ) : (
-            'Split Stems'
+            t('stem_splitting.split_stems')
           )}
         </button>
       </form>
