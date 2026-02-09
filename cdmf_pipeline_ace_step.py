@@ -1195,7 +1195,8 @@ class ACEStepPipeline:
                 sigma_max=sigma_max
             )
 
-        infer_steps = int(sigma_max * infer_steps)
+        # Ensure enough steps for cover/audio2audio so reference is audible (INFERENCE.md: base 32-64 recommended).
+        infer_steps = max(16, int(sigma_max * infer_steps))
         timesteps, num_inference_steps = retrieve_timesteps(
             scheduler,
             num_inference_steps=infer_steps,
@@ -1295,6 +1296,17 @@ class ACEStepPipeline:
         
         if ref_latents is not None:
             frame_length = ref_latents.shape[-1]
+            # Cap ref length for cover/audio2audio so each diffusion step stays fast (avoids 80s+ per step on long refs)
+            max_cover_sec = float(os.environ.get("ACE_COVER_MAX_REF_SECONDS", "90"))
+            max_cover_frames = int(max_cover_sec * 44100 / 512 / 8)
+            if frame_length > max_cover_frames:
+                ref_latents = ref_latents[:, :, :, :max_cover_frames].contiguous()
+                frame_length = max_cover_frames
+                logger.info(
+                    "Capped ref_latents to %d frames (~%.0fs) for faster cover/audio2audio generation (set ACE_COVER_MAX_REF_SECONDS to override).",
+                    max_cover_frames,
+                    max_cover_sec,
+                )
 
         if len(oss_steps) > 0:
             infer_steps = max(oss_steps)
@@ -2087,6 +2099,7 @@ class ACEStepPipeline:
         
         ref_latents = None
         if ref_audio_input is not None and audio2audio_enable:
+            # For cover mode: ref_audio_input = source song (song to cover), per docs/ACE-Step-INFERENCE.md.
             assert ref_audio_input is not None, "ref_audio_input is required for audio2audio task"
             assert os.path.exists(
                 ref_audio_input

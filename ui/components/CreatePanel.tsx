@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { generateApi, preferencesApi, aceStepModelsApi, type LoraAdapter } from '../services/api';
 
 /** Tasks that require ACE-Step Base model only (see docs/ACE-Step-Tutorial.md). */
-const TASKS_REQUIRING_BASE = ['lego', 'extract', 'complete'] as const;
+const TASKS_REQUIRING_BASE = ['cover', 'lego', 'extract', 'complete'] as const;
 function taskRequiresBase(taskType: string): boolean {
   return TASKS_REQUIRING_BASE.includes(taskType as typeof TASKS_REQUIRING_BASE[number]);
 }
@@ -31,6 +31,8 @@ interface CreatePanelProps {
   initialData?: { song: Song, timestamp: number } | null;
   /** Open Settings modal (e.g. to download required model). */
   onOpenSettings?: () => void;
+  /** Open Console logs panel (e.g. when model is downloading in background). */
+  onOpenConsoleLogs?: () => void;
 }
 
 /** Visible tooltip on hover (native title has delay and is unreliable). */
@@ -155,12 +157,17 @@ const VOCAL_LANGUAGES = [
 // Create panel mode: Simple (description), Custom (full controls), Cover (pure cover: source + caption), Lego (add-instrument tracks)
 type CreateMode = 'simple' | 'custom' | 'cover' | 'lego';
 
-export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, initialData, onOpenSettings }) => {
+export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, initialData, onOpenSettings, onOpenConsoleLogs }) => {
   const { isAuthenticated, token } = useAuth();
 
   // Mode: simple | custom | cover | lego
   const [createMode, setCreateMode] = useState<CreateMode>('custom');
   const customMode = createMode === 'custom';
+
+  // ACE-Step model for this generation (only installed models). Updated by workflow (e.g. base for cover) or user override.
+  const [generationDitModel, setGenerationDitModel] = useState<string>('turbo');
+  const [installedDitModels, setInstalledDitModels] = useState<Array<{ id: string; label: string; description?: string }>>([]);
+  const [modelDownloadInProgress, setModelDownloadInProgress] = useState(false);
 
   // Cover tab: pure cover (source + caption) or blend (source + style audio)
   const [coverCaption, setCoverCaption] = useState('');
@@ -172,7 +179,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   // Lego tab only
   const [legoTrackName, setLegoTrackName] = useState('guitar');
   const [legoCaption, setLegoCaption] = useState('');
-  const [legoBackingInfluence, setLegoBackingInfluence] = useState(0.25);
+  const [legoBackingInfluence, setLegoBackingInfluence] = useState(1.0);
   const [legoValidationError, setLegoValidationError] = useState('');
 
   // Shared between Simple and Custom: description/style (genre, mood, etc.) and title
@@ -355,6 +362,42 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
 
   // Fetch LoRA adapters on mount (Training output + custom_lora)
   useEffect(() => { fetchLoraAdapters(); }, [fetchLoraAdapters]);
+
+  // Load installed ACE-Step DiT models and sync generation model from preferences (or default base for cover/lego).
+  useEffect(() => {
+    aceStepModelsApi.list().then((list) => {
+      const installed = (list.dit_models || []).filter((m) => m.installed).map((m) => ({ id: m.id, label: m.label, description: m.description }));
+      setInstalledDitModels(installed);
+      preferencesApi.get().then((prefs) => {
+        const prefDit = (prefs.ace_step_dit_model || 'turbo').trim();
+        const valid = installed.some((m) => m.id === prefDit);
+        setGenerationDitModel(valid ? prefDit : (installed[0]?.id || 'turbo'));
+      }).catch(() => {
+        if (installed.length) setGenerationDitModel(installed[0].id);
+      });
+    }).catch(() => setInstalledDitModels([]));
+  }, []);
+
+  // When switching to Cover or Lego, default model to base (user can override via selector).
+  useEffect(() => {
+    if ((createMode === 'cover' || createMode === 'lego') && installedDitModels.some((m) => m.id === 'base')) {
+      setGenerationDitModel((prev) => (prev === 'turbo' ? 'base' : prev));
+    }
+  }, [createMode, installedDitModels]);
+
+  // Poll model-download status when generating so we can show banner + link to console.
+  useEffect(() => {
+    if (!isGenerating) {
+      setModelDownloadInProgress(false);
+      return;
+    }
+    const poll = () => {
+      generateApi.modelDownloadStatus().then((st) => setModelDownloadInProgress(st.in_progress)).catch(() => setModelDownloadInProgress(false));
+    };
+    poll();
+    const t = setInterval(poll, 2000);
+    return () => clearInterval(t);
+  }, [isGenerating]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -704,16 +747,23 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     const effectiveTaskType = createMode === 'lego' ? 'lego' : createMode === 'cover' ? 'cover' : (customMode ? taskType : (sourceAudioUrl?.trim() ? 'cover' : 'text2music'));
     if (taskRequiresBase(effectiveTaskType)) {
       setLegoValidationError('');
+      setCoverValidationError('');
       try {
         const list = await aceStepModelsApi.list();
         const baseInstalled = list.dit_models.some((m) => m.id === 'base' && m.installed);
         if (!baseInstalled) {
-          setLegoValidationError('Lego (and Extract/Complete) require the Base model. Open Settings to download it, then try again.');
+          const msg = effectiveTaskType === 'cover'
+            ? 'Cover requires the Base model. Open Settings to download it, then try again.'
+            : 'Lego (and Extract/Complete) require the Base model. Open Settings to download it, then try again.';
+          if (effectiveTaskType === 'cover') setCoverValidationError(msg);
+          else setLegoValidationError(msg);
           onOpenSettings?.();
           return;
         }
       } catch (e) {
-        setLegoValidationError('Could not check models. Open Settings to ensure the Base model is installed.');
+        const msg = 'Could not check models. Open Settings to ensure the Base model is installed.';
+        if (effectiveTaskType === 'cover') setCoverValidationError(msg);
+        else setLegoValidationError(msg);
         onOpenSettings?.();
         return;
       }
@@ -784,6 +834,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         lmBatchChunkSize,
         negativePrompt: negativePrompt.trim() || undefined,
         isFormatCaption,
+        aceStepDitModel: generationDitModel,
       });
       return;
     }
@@ -795,6 +846,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         setLegoValidationError('Please select backing audio (required for Lego).');
         return;
       }
+      // Instruction is auto from track name; caption (style) is optional user description (key, BPM, tone). Backend builds prompt = instruction + ", " + caption when caption present.
       const instruction = `Generate the ${legoTrackName} track based on the audio context:`;
       const effGuidance = guidanceScale;
       const effAudioCover = legoBackingInfluence;
@@ -802,9 +854,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       onGenerate({
         customMode: false,
         songDescription: undefined,
-        prompt: instruction + (legoCaption.trim() ? ', ' + legoCaption.trim() : ''),
+        prompt: legoCaption.trim() ? instruction + ', ' + legoCaption.trim() : instruction,
         lyrics: '',
-        style: legoCaption.trim() || instruction,
+        style: legoCaption.trim(), // caption only; do not send instruction as style (backend uses instruction + style for prompt)
         title: title.trim() || `Lego ${legoTrackName}`,
         instrumental: true,
         vocalLanguage: 'en',
@@ -852,6 +904,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         lmBatchChunkSize,
         negativePrompt: negativePrompt.trim() || undefined,
         isFormatCaption,
+        aceStepDitModel: generationDitModel,
       });
       return;
     }
@@ -927,6 +980,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         lmBatchChunkSize,
         negativePrompt: negativePrompt.trim() || undefined,
         isFormatCaption,
+        aceStepDitModel: generationDitModel,
       });
     }
 
@@ -958,6 +1012,46 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
           onLoadedMetadata={(e) => setSourceDuration(e.currentTarget.duration || 0)}
         />
 
+        {/* Model selector: only installed models; workflow (e.g. Cover→base) updates this; user can override. */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 shrink-0">ACE-Step model</label>
+            {installedDitModels.length > 0 ? (
+              <select
+                value={installedDitModels.some((m) => m.id === generationDitModel) ? generationDitModel : (installedDitModels[0]?.id || 'turbo')}
+                onChange={(e) => setGenerationDitModel(e.target.value)}
+                className="bg-zinc-100 dark:bg-black/30 text-zinc-900 dark:text-white text-xs rounded-lg px-2.5 py-1.5 border border-zinc-200 dark:border-white/10 focus:ring-2 focus:ring-pink-500/50 focus:outline-none"
+              >
+                {installedDitModels.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-xs text-zinc-500">No models installed</span>
+            )}
+            {(createMode === 'cover' || createMode === 'lego') && generationDitModel === 'base' && (
+              <span className="text-[10px] text-zinc-500 italic">(recommended for this mode)</span>
+            )}
+          </div>
+          {installedDitModels.length === 0 && (
+            <button type="button" onClick={() => onOpenSettings?.()} className="text-xs font-medium text-pink-600 dark:text-pink-400 hover:underline">
+              Open Settings to download
+            </button>
+          )}
+        </div>
+
+        {/* Notify when pipeline is loading (may be downloading model files in background). */}
+        {modelDownloadInProgress && (
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-amber-500/15 dark:bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+            <span>Model files are being downloaded or prepared. This may take a while. Do not close the app.</span>
+            {onOpenConsoleLogs && (
+              <button type="button" onClick={onOpenConsoleLogs} className="shrink-0 font-medium text-amber-700 dark:text-amber-300 hover:underline">
+                View console logs
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Header - Mode Toggle */}
         <div className="flex items-center justify-end">
           <div className="flex items-center bg-zinc-200 dark:bg-black/40 rounded-lg p-1 border border-zinc-300 dark:border-white/5">
@@ -974,7 +1068,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               Custom
             </button>
             <button
-              onClick={() => { setCreateMode('cover'); setLegoValidationError(''); setCoverValidationError(''); }}
+              onClick={() => {
+                setCreateMode('cover');
+                setLegoValidationError('');
+                setCoverValidationError('');
+                if (installedDitModels.some((m) => m.id === 'base')) setGenerationDitModel('base');
+              }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'cover' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
               Cover
@@ -984,6 +1083,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 setCreateMode('lego');
                 setLegoValidationError('');
                 setCoverValidationError('');
+                if (installedDitModels.some((m) => m.id === 'base')) setGenerationDitModel('base');
                 preferencesApi.update({ ace_step_dit_model: 'base' }).catch(() => {});
               }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'lego' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
@@ -1466,6 +1566,29 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               </div>
             </div>
 
+            {/* Inference steps (cover): up to 80 for base model (docs) */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
+                Inference steps
+                <InfoTooltip text="Cover uses Base model automatically. Docs recommend 32–80 steps for base; more steps = better quality, slower." />
+              </div>
+              <div className="p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <input
+                    type="range"
+                    min="8"
+                    max="80"
+                    step="1"
+                    value={inferenceSteps}
+                    onChange={(e) => { setInferenceSteps(Number(e.target.value)); setQualityPreset('custom'); }}
+                    className="flex-1 h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
+                  />
+                  <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-1 rounded w-10 text-right">{inferenceSteps}</span>
+                </div>
+                <p className="text-[10px] text-zinc-500">1–80 (Base model used for Cover; 32–64 recommended)</p>
+              </div>
+            </div>
+
             {/* Quality preset */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
@@ -1555,24 +1678,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               </select>
             </div>
 
-            {/* Describe the track (caption) */}
+            {/* Caption: style/key/BPM (instruction above is auto from track name) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
-              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Describe the track
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
+                Caption (optional)
+                <InfoTooltip text="Instruction is auto-generated from the track name above (e.g. “Generate the GUITAR track…”). Add caption here for style: key, BPM, tone (e.g. “electric guitar riff, C major, 135 BPM”)." />
               </div>
               <textarea
                 value={legoCaption}
                 onChange={(e) => setLegoCaption(e.target.value)}
-                placeholder="e.g. lead guitar melody with bluesy feel, punchy drums, warm bass line..."
+                placeholder="e.g. electric guitar riff, C major, 135 BPM, funk — or leave blank"
                 className="w-full h-24 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
               />
             </div>
 
-            {/* Backing influence (critical for Lego: low = new instrument, high = copy) */}
+            {/* Backing influence: 1.0 avoids MPS crash on Apple Silicon; lower = more "new instrument" but can crash on Mac (ACE-Step-1.5 #117) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
                 Backing influence
-                <InfoTooltip text="How much the backing audio affects the result. Lower (0.2–0.4) = more new instrument from your description; higher = output closer to the backing (can sound like a copy). Start with 0.25 and increase if timing drifts." />
+                <InfoTooltip text="How much the backing audio affects the result. Default 1.0 avoids crashes on Apple Silicon (MPS). Lower (0.2–0.5) = more new instrument from your description but may crash on Mac. For best timing alignment with the backing, use 1.0 and match duration to your source (e.g. 4 bars at 135 BPM ≈ 7.1 s). See ACE-Step-1.5 #117." />
               </div>
               <div className="p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1622,7 +1746,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
                 Lego tuning (optional)
-                <InfoTooltip text="Critical parameters for Lego. Tweak and report what works best: backing influence (low = new instrument, high = copy), guidance (higher = follow prompt more), steps (more = quality)." />
+                <InfoTooltip text="Lego: backing influence 1.0 = stable on all platforms (required on Apple Silicon). Shorter segments (e.g. 4 bars) and matching duration to source BPM improve timing. Thinking is off for Lego so the backing drives context. See ACE-Step-1.5 #117." />
               </div>
               <div className="p-3 space-y-4">
                 <div className="space-y-2">
@@ -2262,20 +2386,20 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5">
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Inference Steps</label>
-                  <InfoTooltip text="Number of denoising steps. 65 recommended for quality (low CFG + high steps). Turbo: 8–20." />
+                  <InfoTooltip text="Number of denoising steps. 65 recommended for quality (low CFG + high steps). Turbo: 8–20. Base/Cover: 32–80 (docs)." />
                 </span>
                 <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{inferenceSteps}</span>
               </div>
               <input
                 type="range"
                 min="4"
-                max="75"
+                max="80"
                 step="1"
                 value={inferenceSteps}
                 onChange={(e) => { setInferenceSteps(Number(e.target.value)); setQualityPreset('custom'); }}
                 className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
               />
-              <p className="text-[10px] text-zinc-500">65 recommended for quality; base/SFT can use up to 75 steps</p>
+              <p className="text-[10px] text-zinc-500">65 recommended for quality; base/cover can use up to 80 steps (INFERENCE.md)</p>
             </div>
 
             {/* Guidance Scale */}
@@ -2589,7 +2713,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 {(taskType === 'cover' || taskType === 'audio2audio') && 'Transform an existing track: set a source/cover audio and describe the new style. Use Cover Strength to control how much to follow the original.'}
                 {taskType === 'repaint' && 'Regenerate only a time segment of the source. Set start/end (seconds; -1 = end of file) and style for that section.'}
                 {taskType === 'extend' && 'Extend the source audio. Use source audio and optional style for the continuation.'}
-                {(taskType === 'lego' || taskType === 'extract' || taskType === 'complete') && 'Requires ACE-Step 1.5 Base model. Lego: add new tracks to existing. Extract: separate stems. Complete: add accompaniment to a single track.'}
+                {(taskType === 'cover' || taskType === 'lego' || taskType === 'extract' || taskType === 'complete') && 'Requires ACE-Step 1.5 Base model. Cover: style transfer. Lego: add new tracks. Extract: separate stems. Complete: add accompaniment.'}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">

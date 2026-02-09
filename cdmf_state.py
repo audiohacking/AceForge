@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 
 from ace_model_setup import ace_models_present
 
@@ -24,6 +24,24 @@ def set_current_generation_job_id(job_id: Optional[str]) -> None:
 def get_current_generation_job_id() -> Optional[str]:
     """Return the current thread's generation job id, or None."""
     return getattr(_current_job_id_holder, "job_id", None)
+
+
+# ---------------------------------------------------------------------------
+# Progress updater (called from log handler when tqdm progress is parsed)
+# ---------------------------------------------------------------------------
+
+_progress_updater: Optional[Callable[[int, int, int, Optional[float]], None]] = None
+
+
+def set_progress_updater(cb: Optional[Callable[[int, int, int, Optional[float]], None]]) -> None:
+    """Set a callback(percent, current, total, eta_seconds) used to update API job from parsed log progress."""
+    global _progress_updater
+    _progress_updater = cb
+
+
+def get_progress_updater() -> Optional[Callable[[int, int, int, Optional[float]], None]]:
+    """Return the current progress updater, or None."""
+    return _progress_updater
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +73,15 @@ MODEL_STATUS: Dict[str, Any] = {
     # "unknown"      -> initial state before we probe disk
     "state": "unknown",
     "message": "",
+}
+
+# ---------------------------------------------------------------------------
+# Generation pipeline loading (may trigger HuggingFace model download on first use)
+# ---------------------------------------------------------------------------
+
+GENERATION_MODEL_LOADING: Dict[str, Any] = {
+    "in_progress": False,
+    "message": "Preparing model (downloading if needed)...",
 }
 
 # ---------------------------------------------------------------------------

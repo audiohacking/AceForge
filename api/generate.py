@@ -21,7 +21,7 @@ def _uppercase_track_in_instruction(instruction):
         return instruction[: m.start(2)] + m.group(2).upper() + instruction[m.end(2) :]
     return instruction
 
-from cdmf_paths import get_output_dir, get_user_data_dir, load_config
+from cdmf_paths import get_output_dir, get_user_data_dir, get_models_folder, load_config, save_config
 from cdmf_tracks import get_audio_duration, list_lora_adapters, load_track_meta, save_track_meta
 from cdmf_generation_job import GenerationCancelled
 import cdmf_state
@@ -57,6 +57,38 @@ def reset_generation_queue() -> None:
 def _is_cancel_requested(job_id: str) -> bool:
     with _jobs_lock:
         return job_id in _cancel_requested
+
+
+def _is_model_available(dit_tag: str) -> bool:
+    """Return True if the given DiT model is installed and ready (no download needed). Used to promote pending_model jobs."""
+    if not dit_tag or not isinstance(dit_tag, str):
+        return False
+    dit = dit_tag.strip().lower()
+    DIT_15_FOLDERS = {
+        "turbo": "acestep-v15-turbo",
+        "base": "acestep-v15-base",
+        "sft": "acestep-v15-sft",
+        "turbo-shift1": "acestep-v15-turbo-shift1",
+        "turbo-shift3": "acestep-v15-turbo-shift3",
+        "turbo-continuous": "acestep-v15-turbo-continuous",
+    }
+    REQUIRED_SUBDIRS = ("music_dcae_f8c8", "music_vocoder", "ace_step_transformer", "umt5-base")
+    folder = DIT_15_FOLDERS.get(dit)
+    models_root = Path(get_models_folder()) / "checkpoints"
+    if folder:
+        candidate = models_root / folder
+        if not candidate.exists():
+            return False
+        for sub in REQUIRED_SUBDIRS:
+            if not (candidate / sub).exists():
+                return False
+        return True
+    # Legacy v1
+    try:
+        from ace_model_setup import ace_models_present
+        return ace_models_present()
+    except Exception:
+        return False
 
 
 def _refs_dir() -> Path:
@@ -115,10 +147,45 @@ def _on_job_progress(
 register_job_progress_callback(_on_job_progress)
 
 
+def _update_job_progress_from_log(
+    percent: int, current: int, total: int, eta_seconds: float | None
+) -> None:
+    """Update current job progress from parsed tqdm log line (log handler runs in same thread as worker)."""
+    with _jobs_lock:
+        jid = cdmf_state.get_current_generation_job_id()
+        if not jid:
+            return
+        job = _jobs.get(jid)
+        if not job:
+            return
+        job["progressPercent"] = round(float(percent), 1)
+        job["progressSteps"] = f"{current}/{total}"
+        if eta_seconds is not None:
+            job["progressEta"] = round(float(eta_seconds), 1)
+
+
 def _run_generation(job_id: str) -> None:
     """Background: run generate_track_ace and update job."""
     global _generation_busy, _current_job_id
+    prev_config = None
+    config_switched = False
     try:
+        with _jobs_lock:
+            job = _jobs.get(job_id)
+            if not job or job.get("status") != "queued":
+                return
+            job_dit = job.get("dit_model") or "turbo"
+        # If required model is not installed, leave job as pending_model so it runs after user installs it.
+        if not _is_model_available(job_dit):
+            logging.info("[API generate] Job %s waiting for model %s (not installed)", job_id, job_dit)
+            with _jobs_lock:
+                job = _jobs.get(job_id)
+                if job and job.get("status") == "queued":
+                    job["status"] = "pending_model"
+                    job["pendingReason"] = (
+                        f"Model '{job_dit}' is not installed. Install it from Settings → Models to run this job."
+                    )
+            return
         with _jobs_lock:
             job = _jobs.get(job_id)
             if not job or job.get("status") != "queued":
@@ -131,8 +198,20 @@ def _run_generation(job_id: str) -> None:
             _current_job_id = job_id
 
         cdmf_state.set_current_generation_job_id(job_id)
+        cdmf_state.set_progress_updater(_update_job_progress_from_log)
         cancel_check = lambda: _is_cancel_requested(job_id)
-        from generate_ace import generate_track_ace
+        from generate_ace import generate_track_ace, clear_ace_pipeline
+
+        # Use job's dit_model (e.g. base for cover). Temporarily switch config so pipeline loads the right model.
+        with _jobs_lock:
+            j = _jobs.get(job_id)
+            job_dit = (j.get("dit_model") or "turbo") if j else "turbo"
+        prev_config = load_config() or {}
+        prev_config = dict(prev_config)
+        config_switched = job_dit != (prev_config.get("ace_step_dit_model") or "turbo")
+        if config_switched:
+            save_config({**prev_config, "ace_step_dit_model": job_dit})
+            clear_ace_pipeline()
 
         params = job.get("params") or {}
         if not isinstance(params, dict):
@@ -219,13 +298,17 @@ def _run_generation(job_id: str) -> None:
                     bpm = None
             except (TypeError, ValueError):
                 bpm = None
-        # Lego/extract/complete: instruction (uppercase track) + caption appended with comma.
+        # Lego/extract/complete: instruction (uppercase track) + optional caption. Instruction is auto (e.g. "Generate the GUITAR track..."); caption is user style (key, BPM, tone).
         # No metas — BPM/key/timesignature should match the input backing.
         if task in ("lego", "extract", "complete"):
             instruction = _uppercase_track_in_instruction(
                 instruction or "Generate an instrument track based on the audio context:"
             )
-            prompt = (instruction.rstrip(":").strip() + ", " + (caption or "").strip()).strip() if (instruction or caption) else instruction
+            cap = (caption or "").strip()
+            if not cap:
+                prompt = instruction.rstrip(":").strip()
+            else:
+                prompt = (instruction.rstrip(":").strip() + ", " + cap).strip()
             if not prompt:
                 prompt = instruction or "Generate an instrument track based on the audio context"
         title = (params.get("title") or "Untitled").strip() or "Track"
@@ -264,12 +347,13 @@ def _run_generation(job_id: str) -> None:
 
         # When reference/source audio is provided, enable Audio2Audio so ACE-Step uses it (cover/retake/repaint/lego).
         # Defaults aligned with ACE-Step-MCP (ref_audio_strength 0.5) and cover/retake UX (strong source → 0.8).
-        # Lego/extract/complete: low ref_audio_strength so output follows prompt (new instrument), not copy of backing.
+        # Lego/extract/complete: default ref_audio_strength=1.0 to avoid MPS crash (batch dim mismatch when <1.0).
+        # See https://github.com/ace-step/ACE-Step-1.5/issues/117 — lower values can improve "new instrument" feel but crash on Apple Silicon.
         # See docs/ACE-Step-INFERENCE.md: audio_cover_strength 1.0 = strong adherence; lower = more prompt influence.
         audio2audio_enable = bool(src_audio_path)
         ref_default = 0.8 if task in ("cover", "retake") else (0.5 if task == "audio2audio" else 0.7)
         if task in ("lego", "extract", "complete"):
-            ref_default = 0.25  # low strength so output follows prompt (instrument) while matching backing timing
+            ref_default = 1.0  # 1.0 avoids MPS crash; user can lower via legoBackingInfluence if not on Apple Silicon
         # audio_cover_strength per ACE-Step; lego/cover blend use specific overrides when set
         ref_audio_strength = params.get("legoBackingInfluence") if task in ("lego", "extract", "complete") else None
         if ref_audio_strength is None and cover_blend:
@@ -302,6 +386,15 @@ def _run_generation(job_id: str) -> None:
             retake_variance = 0.2
         retake_variance = max(0.0, min(1.0, retake_variance))
 
+        # Shift (timestep): 3.0 recommended for lego/timing; 6.0 pipeline default for others. See ACE-Step-1.5 issue #117.
+        try:
+            shift_val = float(params.get("shift") or params.get("shiftFactor") or 0)
+        except (TypeError, ValueError):
+            shift_val = 0.0
+        if shift_val <= 0:
+            shift_val = 3.0 if task in ("lego", "extract", "complete") else 6.0
+        shift_val = max(0.1, min(10.0, shift_val))
+
         # LoRA adapter (optional): path or folder name under custom_lora
         lora_name_or_path = (params.get("loraNameOrPath") or params.get("lora_name_or_path") or "").strip()
         try:
@@ -310,8 +403,11 @@ def _run_generation(job_id: str) -> None:
             lora_weight = 0.75
         lora_weight = max(0.0, min(2.0, lora_weight))
 
-        # Thinking / LM / CoT (passed through so pipeline or future LM path can use them)
+        # Thinking / LM / CoT (passed through so pipeline or future LM path can use them).
+        # Lego/extract/complete: force thinking=False so src_audio drives context; thinking=True overrides with LLM codes (issue #117).
         thinking = bool(params.get("thinking", False))
+        if task in ("lego", "extract", "complete"):
+            thinking = False
         use_cot_metas = bool(params.get("useCotMetas", True))
         use_cot_caption = bool(params.get("useCotCaption", True))
         # Lego/extract/complete: instruction must stay verbatim ("Generate the X track based on the audio context:").
@@ -387,6 +483,7 @@ def _run_generation(job_id: str) -> None:
             lora_weight=lora_weight,
             cancel_check=cancel_check,
             vocal_language=vocal_lang or "",
+            shift=shift_val,
             thinking=thinking,
             use_cot_metas=use_cot_metas,
             use_cot_caption=use_cot_caption,
@@ -451,25 +548,62 @@ def _run_generation(job_id: str) -> None:
                 job["status"] = "cancelled"
                 job["error"] = "Cancelled by user"
     except Exception as e:
-        logging.exception("Generation job %s failed", job_id)
-        with _jobs_lock:
-            job = _jobs.get(job_id)
-            if job:
-                job["status"] = "failed"
-                job["error"] = str(e)
+        err_msg = str(e)
+        # Keep job queued as pending_model when model is missing so it can run after user installs it.
+        if "not installed" in err_msg.lower() or "Settings → Models" in err_msg:
+            logging.info("[API generate] Job %s waiting for model: %s", job_id, err_msg[:120])
+            with _jobs_lock:
+                job = _jobs.get(job_id)
+                if job:
+                    job["status"] = "pending_model"
+                    job["pendingReason"] = err_msg
+                    job["error"] = None
+        else:
+            logging.exception("Generation job %s failed", job_id)
+            with _jobs_lock:
+                job = _jobs.get(job_id)
+                if job:
+                    job["status"] = "failed"
+                    job["error"] = err_msg
     finally:
+        cdmf_state.set_progress_updater(None)
+        if config_switched and prev_config:
+            save_config(prev_config)
+            clear_ace_pipeline()
         cdmf_state.set_current_generation_job_id(None)
         _generation_busy = False
         with _jobs_lock:
             _current_job_id = None
             _cancel_requested.discard(job_id)
-        # Start next queued job (skips cancelled: they are no longer "queued")
+        # Promote pending_model jobs to queued when their model is now available; then start first queued job.
         with _jobs_lock:
+            for jid in _job_order:
+                j = _jobs.get(jid)
+                if j and j.get("status") == "pending_model":
+                    dit = j.get("dit_model") or "turbo"
+                    if _is_model_available(dit):
+                        j["status"] = "queued"
+                        j["pendingReason"] = None
+                        logging.info("[API generate] Job %s promoted to queued (model %s now available)", jid, dit)
             for jid in _job_order:
                 j = _jobs.get(jid)
                 if j and j.get("status") == "queued":
                     threading.Thread(target=_run_generation, args=(jid,), daemon=True).start()
                     break
+
+
+@bp.route("/model-download-status", methods=["GET"])
+def get_model_download_status():
+    """GET /api/generate/model-download-status — whether pipeline is loading (may be downloading model files)."""
+    try:
+        st = getattr(cdmf_state, "GENERATION_MODEL_LOADING", {})
+        return jsonify({
+            "in_progress": bool(st.get("in_progress")),
+            "message": st.get("message") or "Preparing model (downloading if needed)...",
+        })
+    except Exception as e:
+        logging.warning("[API generate] model-download-status failed: %s", e)
+        return jsonify({"in_progress": False, "message": ""})
 
 
 @bp.route("/lora_adapters", methods=["GET"])
@@ -554,7 +688,15 @@ def create_job():
         except (TypeError, ValueError):
             params_copy = {}
         config = load_config()
-        dit_tag = config.get("ace_step_dit_model") or params_copy.get("aceStepDitModel") or "turbo"
+        # User override from Generation tab model selector takes precedence; else auto base for cover (per docs).
+        task_for_dit = (params_copy.get("task_type") or params_copy.get("taskType") or "text2music").strip().lower()
+        explicit_dit = (params_copy.get("aceStepDitModel") or params_copy.get("ace_step_dit_model") or "").strip()
+        if explicit_dit:
+            dit_tag = explicit_dit
+        elif task_for_dit == "cover":
+            dit_tag = "base"
+        else:
+            dit_tag = config.get("ace_step_dit_model") or "turbo"
         lm_tag = config.get("ace_step_lm") or params_copy.get("aceStepLm") or "1.7B"
         with _jobs_lock:
             _jobs[job_id] = {
@@ -608,8 +750,40 @@ def get_status(job_id: str):
         "progressStage": job.get("progressStage"),
         "result": job.get("result"),
         "error": job.get("error"),
+        "pendingReason": job.get("pendingReason") if status == "pending_model" else None,
     }
     return jsonify(out)
+
+
+@bp.route("/retry-pending", methods=["POST"])
+def retry_pending():
+    """POST /api/generate/retry-pending — promote pending_model jobs to queued if model is now available, start first queued job. Call after model download completes."""
+    global _generation_busy
+    promoted = 0
+    started = None
+    with _jobs_lock:
+        for jid in _job_order:
+            j = _jobs.get(jid)
+            if j and j.get("status") == "pending_model":
+                dit = j.get("dit_model") or "turbo"
+                if _is_model_available(dit):
+                    j["status"] = "queued"
+                    j["pendingReason"] = None
+                    promoted += 1
+                    logging.info("[API generate] Job %s promoted to queued (model %s now available)", jid, dit)
+        if not _generation_busy:
+            for jid in _job_order:
+                j = _jobs.get(jid)
+                if j and j.get("status") == "queued":
+                    _generation_busy = True
+                    threading.Thread(target=_run_generation, args=(jid,), daemon=True).start()
+                    started = jid
+                    break
+    return jsonify({
+        "ok": True,
+        "promoted": promoted,
+        "startedJobId": started,
+    })
 
 
 @bp.route("/unstick", methods=["POST"])
@@ -641,9 +815,10 @@ def cancel_job(job_id: str):
         if not job:
             return jsonify({"error": "Job not found"}), 404
         status = job.get("status", "unknown")
-        if status == "queued":
+        if status in ("queued", "pending_model"):
             job["status"] = "cancelled"
             job["error"] = "Cancelled by user"
+            job["pendingReason"] = None
             return jsonify({"cancelled": True, "jobId": job_id, "message": "Job removed from queue."})
         if status == "running":
             _cancel_requested.add(job_id)

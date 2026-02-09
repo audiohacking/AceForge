@@ -280,6 +280,8 @@ export interface AceStepModelItem {
   steps?: number;
   cfg?: boolean;
   exclusive_tasks?: string[];
+  /** Approximate size in GB for download confirmation. */
+  size_gb?: number;
 }
 
 export interface AceStepDiscoveredModel {
@@ -312,6 +314,9 @@ export interface AceStepDownloadStatus {
 export const aceStepModelsApi = {
   list: (): Promise<AceStepModelsResponse> =>
     api('/api/ace-step/models') as Promise<AceStepModelsResponse>,
+  /** Free/total disk space for models directory (for download confirmation). */
+  diskSpace: (): Promise<{ free_gb: number; total_gb: number; path: string }> =>
+    api('/api/ace-step/models/disk-space') as Promise<{ free_gb: number; total_gb: number; path: string }>,
   download: (model: string): Promise<{ ok?: boolean; started?: boolean; error?: string; path?: string; hint?: string }> =>
     api('/api/ace-step/models/download', { method: 'POST', body: { model } }),
   downloadStatus: (): Promise<AceStepDownloadStatus> =>
@@ -322,8 +327,9 @@ export const aceStepModelsApi = {
 
 export interface GenerationJob {
   jobId: string;
-  status: 'pending' | 'queued' | 'running' | 'succeeded' | 'failed';
+  status: 'pending' | 'queued' | 'running' | 'succeeded' | 'failed' | 'pending_model';
   queuePosition?: number;
+  pendingReason?: string | null;
   etaSeconds?: number;
   progressPercent?: number;
   progressSteps?: string;
@@ -355,8 +361,16 @@ export const generateApi = {
   cancelJob: (jobId: string, token: string): Promise<{ cancelled: boolean; jobId: string; message: string }> =>
     api(`/api/generate/cancel/${jobId}`, { method: 'POST', token }),
 
+  /** Promote pending_model jobs to queued when model is available; start first queued job. Call after model download. */
+  retryPending: (): Promise<{ ok: boolean; promoted: number; startedJobId?: string }> =>
+    api('/api/generate/retry-pending', { method: 'POST' }) as Promise<{ ok: boolean; promoted: number; startedJobId?: string }>,
+
   getHistory: (token: string): Promise<{ jobs: GenerationJob[] }> =>
     api('/api/generate/history', { token }),
+
+  /** Whether the generation pipeline is loading (may be downloading model files). Show banner + link to console. */
+  modelDownloadStatus: (): Promise<{ in_progress: boolean; message?: string }> =>
+    api('/api/generate/model-download-status') as Promise<{ in_progress: boolean; message?: string }>,
 
   /** List LoRA adapters (Training output and custom_lora folder). */
   getLoraAdapters: (): Promise<{ adapters: LoraAdapter[] }> =>
