@@ -329,35 +329,158 @@ def _refine_prompt_with_lm(
 ):
     """
     Optionally refine prompt/lyrics using the bundled ACE-Step 5Hz LM (no external LLM).
-    Returns (refined_prompt, refined_lyrics) or None if LM inference is not available.
+    Returns metadata dict or None if LM inference is not available.
     """
     try:
-        # ACE-Step 1.5 may expose LLMHandler and format_sample / create_sample
+        # ACE-Step 1.5 primary layout
         from acestep.llm_inference import LLMHandler
         from acestep.inference import format_sample
-    except ImportError:
-        return None
+    except Exception:
+        try:
+            # Fallback layout used by some builds
+            from acestep.inference import LLMHandler, format_sample  # type: ignore[attr-defined]
+        except Exception:
+            return None
     try:
         llm = LLMHandler()
-        llm.initialize(
-            checkpoint_dir=str(lm_checkpoint_path),
-            device="cuda" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cpu",
-        )
-        result = format_sample(
-            llm,
-            caption=prompt or "",
-            lyrics=lyrics or "",
-            temperature=lm_temperature,
-            top_k=lm_top_k if lm_top_k else None,
-            top_p=lm_top_p,
-        )
+        device = "cuda" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cpu"
+        lm_path = str(lm_checkpoint_path)
+        lm_parent = os.path.dirname(lm_path)
+        lm_name = os.path.basename(lm_path)
+        init_ok = False
+        init_attempts = [
+            {"checkpoint_dir": lm_parent, "lm_model_path": lm_name, "backend": "pytorch", "device": device},
+            {"checkpoint_dir": lm_parent, "lm_model_path": lm_name, "backend": "transformers", "device": device},
+            {"checkpoint_dir": lm_parent, "lm_model_path": lm_name, "backend": "hf", "device": device},
+            {"checkpoint_dir": lm_parent, "lm_model_path": lm_name, "device": device},
+            {"checkpoint_dir": lm_path, "device": device},
+            {"lm_model_path": lm_path, "device": device},
+        ]
+        if device == "cuda":
+            init_attempts.append({"checkpoint_dir": lm_parent, "lm_model_path": lm_name, "backend": "vllm", "device": device})
+        for kwargs in init_attempts:
+            try:
+                llm.initialize(**kwargs)
+                init_ok = True
+                break
+            except Exception:
+                continue
+        if not init_ok:
+            return None
+        def _run_format():
+            return format_sample(
+                llm,
+                caption=prompt or "",
+                lyrics=lyrics or "",
+                temperature=lm_temperature,
+                top_k=lm_top_k if lm_top_k else None,
+                top_p=lm_top_p,
+            )
+
+        result = _run_format()
+        status_msg = str(getattr(result, "status_message", "") or "")
+        if "llm not initialized" in status_msg.lower():
+            retry_attempts = [
+                {"checkpoint_dir": lm_parent, "lm_model_path": lm_name, "backend": "pytorch", "device": device},
+                {"checkpoint_dir": lm_parent, "lm_model_path": lm_name, "backend": "transformers", "device": device},
+                {"checkpoint_dir": lm_parent, "lm_model_path": lm_name, "backend": "hf", "device": device},
+            ]
+            for kwargs in retry_attempts:
+                try:
+                    llm.initialize(**kwargs)
+                    result = _run_format()
+                    status_msg = str(getattr(result, "status_message", "") or "")
+                    if "llm not initialized" not in status_msg.lower():
+                        break
+                except Exception:
+                    continue
         if result and getattr(result, "caption", None) is not None:
             new_caption = getattr(result, "caption", None) or prompt
             new_lyrics = getattr(result, "lyrics", None) if hasattr(result, "lyrics") else lyrics
-            return (new_caption, new_lyrics or lyrics)
+            lm_duration = None
+            try:
+                if hasattr(result, "duration") and getattr(result, "duration") is not None:
+                    lm_duration = float(getattr(result, "duration"))
+                elif hasattr(result, "cot_duration") and getattr(result, "cot_duration") is not None:
+                    lm_duration = float(getattr(result, "cot_duration"))
+            except Exception:
+                lm_duration = None
+            return {
+                "caption": new_caption,
+                "lyrics": new_lyrics or lyrics,
+                "duration": lm_duration,
+            }
     except Exception:
         pass
     return None
+
+
+def _audio_duration_seconds(audio_path):
+    """
+    Best-effort duration probe for local audio paths.
+    Returns duration in seconds or None when unavailable.
+    """
+    if not audio_path:
+        return None
+    try:
+        from pydub import AudioSegment
+        seg = AudioSegment.from_file(str(audio_path))
+        sec = float(len(seg)) / 1000.0
+        return sec if sec > 0 else None
+    except Exception:
+        pass
+    try:
+        if torchaudio is not None:
+            wav, sr = torchaudio.load(str(audio_path))
+            if sr and getattr(wav, "shape", None) is not None and wav.shape[-1] > 0:
+                return float(wav.shape[-1]) / float(sr)
+    except Exception:
+        pass
+    return None
+
+
+def _estimate_duration_from_lyrics(lyrics_text):
+    """
+    Heuristic duration estimate from lyric content when LM metadata is unavailable.
+    Returns seconds or None.
+    """
+    text = (lyrics_text or "").strip()
+    if not text:
+        return None
+    low = text.lower()
+    if low in ("[inst]", "[instrumental]", "instrumental"):
+        return None
+
+    lines = [ln.strip() for ln in text.splitlines()]
+    non_empty = [ln for ln in lines if ln]
+    if not non_empty:
+        return None
+
+    # Ignore section tags like [Verse], [Chorus], etc. for word counting.
+    section_pat = re.compile(r"^\s*\[[^\]]+\]\s*$")
+    lyric_lines = [ln for ln in non_empty if not section_pat.match(ln)]
+    if not lyric_lines:
+        return None
+
+    words = 0
+    for ln in lyric_lines:
+        words += len(re.findall(r"[A-Za-z0-9']+", ln))
+
+    # Two complementary estimates:
+    # 1) word-rate estimate (sung lyrics are often ~95-120 wpm; use ~0.58 s/word)
+    # 2) line-rate estimate (phrases + rests; ~4.3 s per lyric line)
+    word_est = words * 0.58
+    line_est = len(lyric_lines) * 4.3
+
+    # Take the larger estimate to reduce premature cutoffs.
+    est = max(word_est, line_est)
+
+    # Add a small arrangement buffer for intro/outro/transitions.
+    est += 12.0
+
+    # Keep in sane generation bounds.
+    est = max(30.0, min(360.0, est))
+    return float(est)
 
 
 # class ACEStepPipeline(DiffusionPipeline):
@@ -1961,6 +2084,7 @@ class ACEStepPipeline:
         start_time = time.time()
 
         # LM planner: optional refinement of prompt/lyrics using bundled 5Hz LM (no external LLM)
+        lm_duration = None
         if thinking and lm_checkpoint_path:
             refined = _refine_prompt_with_lm(
                 lm_checkpoint_path=lm_checkpoint_path,
@@ -1976,9 +2100,13 @@ class ACEStepPipeline:
                 lm_negative_prompt=lm_negative_prompt,
             )
             if refined is not None:
-                prompt, lyrics = refined
+                prompt = refined.get("caption", prompt)
+                lyrics = refined.get("lyrics", lyrics)
+                lm_duration = refined.get("duration")
                 if logger:
                     logger.info("LM planner refined caption/lyrics; using for DiT.")
+                if logger and lm_duration and lm_duration > 0:
+                    logger.info(f"LM planner suggested duration: {lm_duration:.1f}s")
         elif thinking and logger:
             logger.info(
                 "Thinking on but no LM planner path (select an LM in Settings → Models). DiT-only."
@@ -2045,8 +2173,23 @@ class ACEStepPipeline:
             )
 
         if audio_duration <= 0:
-            audio_duration = random.uniform(30.0, 240.0)
-            logger.info(f"random audio duration: {audio_duration}")
+            if lm_duration is not None and lm_duration > 0:
+                audio_duration = lm_duration
+                logger.info(f"Using LM metadata duration: {audio_duration:.1f}s")
+            else:
+                ref_like_path = ref_audio_input if (audio2audio_enable and ref_audio_input) else src_audio_path
+                ref_duration = _audio_duration_seconds(ref_like_path)
+                if ref_duration is not None and ref_duration > 0:
+                    audio_duration = ref_duration
+                    logger.info(f"Using source/reference duration: {audio_duration:.1f}s")
+                else:
+                    lyric_duration = _estimate_duration_from_lyrics(lyrics)
+                    if lyric_duration is not None and lyric_duration > 0:
+                        audio_duration = lyric_duration
+                        logger.info(f"Using lyric-derived duration estimate: {audio_duration:.1f}s")
+                    else:
+                        audio_duration = random.uniform(30.0, 240.0)
+                        logger.info(f"random audio duration: {audio_duration}")
 
         end_time = time.time()
         preprocess_time_cost = end_time - start_time

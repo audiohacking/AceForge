@@ -5,6 +5,7 @@ job queue stored under get_user_data_dir(). No auth. Real implementation (no moc
 
 import json
 import logging
+import os
 import re
 import threading
 import time
@@ -21,11 +22,11 @@ def _uppercase_track_in_instruction(instruction):
         return instruction[: m.start(2)] + m.group(2).upper() + instruction[m.end(2) :]
     return instruction
 
-from cdmf_paths import get_output_dir, get_user_data_dir, load_config
+from cdmf_paths import get_output_dir, get_user_data_dir, get_models_folder, load_config
 from cdmf_tracks import get_audio_duration, list_lora_adapters, load_track_meta, save_track_meta
 from cdmf_generation_job import GenerationCancelled
 import cdmf_state
-from generate_ace import register_job_progress_callback
+from generate_ace import register_job_progress_callback, _resolve_lm_checkpoint_path
 
 bp = Blueprint("api_generate", __name__)
 
@@ -183,12 +184,10 @@ def _run_generation(job_id: str) -> None:
         negative_prompt_str = (params.get("negativePrompt") or params.get("negative_prompt") or "").strip()
         try:
             d = params.get("duration")
-            duration = float(d if d is not None else 60)
+            # Keep <=0 as "Auto" and pass through to the model path.
+            duration = float(d if d is not None else -1)
         except (TypeError, ValueError):
-            duration = 60
-        # UI may send duration=-1 or 0; for cover we may get duration from source file below
-        if duration > 0:
-            duration = max(15, min(240, duration))
+            duration = -1
         # Guide: 65 steps + CFG 4.0 for best quality; low CFG reduces artifacts (see community guide).
         try:
             steps = int(params.get("inferenceSteps") or 65)
@@ -405,7 +404,7 @@ def _run_generation(job_id: str) -> None:
             path = Path(str(wav_path))
         filename = path.name
         audio_url = f"/audio/{filename}"
-        actual_seconds = float(summary.get("actual_seconds") or duration)
+        actual_seconds = float(summary.get("actual_seconds") or (duration if duration > 0 else 0))
 
         # Save title, lyrics, style to track metadata so they appear in the library (input params only; model does not return lyrics)
         try:
@@ -750,16 +749,374 @@ def get_debug(task_id: str):
     return jsonify({"rawResponse": job})
 
 
-@bp.route("/format", methods=["POST"])
-def format_input():
-    """POST /api/generate/format — stub; return same payload."""
-    data = request.get_json(silent=True) or {}
-    return jsonify({
+def _format_with_lm(data: dict) -> tuple[dict | None, str | None]:
+    """
+    Best-effort input formatting via ACE-Step LM.
+    Returns (response payload, unavailable_reason).
+    - payload is not None when formatter executed (including success=False responses from LM).
+    - unavailable_reason explains why LM formatting could not run at all.
+    """
+    caption = (data.get("caption") or "").strip()
+    lyrics = (data.get("lyrics") or "").strip()
+    if not caption and not lyrics:
+        return None, "Please provide Style or Lyrics input to format."
+
+    LLMHandler = None
+    format_sample = None
+    import_errors: list[str] = []
+    try:
+        from acestep.llm_inference import LLMHandler as _LLMHandler
+        from acestep.inference import format_sample as _format_sample
+        LLMHandler = _LLMHandler
+        format_sample = _format_sample
+    except Exception as e1:
+        import_errors.append(f"acestep.llm_inference + acestep.inference.format_sample: {e1}")
+    if LLMHandler is None or format_sample is None:
+        try:
+            from acestep.inference import LLMHandler as _LLMHandler  # type: ignore[attr-defined]
+            from acestep.inference import format_sample as _format_sample
+            LLMHandler = _LLMHandler
+            format_sample = _format_sample
+        except Exception as e2:
+            import_errors.append(f"acestep.inference (LLMHandler, format_sample): {e2}")
+    if LLMHandler is None or format_sample is None:
+        reason = (
+            "LM modules failed to import. "
+            "This build likely has a non-1.5 ACE-Step package. "
+            f"Tried: {' | '.join(import_errors)}"
+        )
+        logging.info("[API format] %s", reason)
+        return None, reason
+
+    cfg = load_config() or {}
+    lm_id = str(cfg.get("ace_step_lm") or "1.7B").strip()
+    if not lm_id or lm_id.lower() == "none":
+        return None, "LM model is set to 'none' in Settings > Models."
+
+    try:
+        checkpoints_root = get_models_folder() / "checkpoints"
+        lm_checkpoint_path = _resolve_lm_checkpoint_path(lm_id, checkpoints_root)
+    except Exception as path_err:
+        reason = f"Could not resolve LM checkpoint path: {path_err}"
+        logging.info("[API format] %s", reason)
+        return None, reason
+    if not lm_checkpoint_path:
+        return None, f"LM checkpoint for '{lm_id}' not found. Download it in Settings > Models."
+
+    user_metadata: dict = {}
+    try:
+        bpm = data.get("bpm")
+        if bpm is not None:
+            bpm_i = int(float(bpm))
+            if bpm_i > 0:
+                user_metadata["bpm"] = bpm_i
+    except Exception:
+        pass
+    try:
+        duration = data.get("duration")
+        if duration is not None:
+            duration_f = float(duration)
+            if duration_f > 0:
+                user_metadata["duration"] = duration_f
+    except Exception:
+        pass
+    key_scale = (data.get("keyScale") or data.get("key_scale") or "").strip()
+    if key_scale:
+        user_metadata["keyscale"] = key_scale
+    time_sig = (data.get("timeSignature") or data.get("time_signature") or "").strip()
+    if time_sig:
+        user_metadata["timesignature"] = time_sig
+    language = (data.get("language") or "").strip()
+    if language and language.lower() not in ("unknown", "auto"):
+        user_metadata["language"] = language
+
+    try:
+        temperature = float(data.get("temperature") or 0.85)
+    except Exception:
+        temperature = 0.85
+    try:
+        top_k = int(data.get("topK")) if data.get("topK") not in (None, "") else None
+    except Exception:
+        top_k = None
+    try:
+        top_p = float(data.get("topP")) if data.get("topP") not in (None, "") else None
+    except Exception:
+        top_p = None
+
+    try:
+        llm = LLMHandler()
+        device = "cuda" if bool(os.environ.get("CUDA_VISIBLE_DEVICES")) else "cpu"
+        lm_path = Path(str(lm_checkpoint_path))
+        init_errors: list[str] = []
+        init_ok = False
+        init_attempts = [
+            # Prefer explicit non-vLLM backends first, especially on CPU/MPS runs.
+            {"checkpoint_dir": str(lm_path.parent), "lm_model_path": lm_path.name, "backend": "pytorch", "device": device},
+            {"checkpoint_dir": str(lm_path.parent), "lm_model_path": lm_path.name, "backend": "transformers", "device": device},
+            {"checkpoint_dir": str(lm_path.parent), "lm_model_path": lm_path.name, "backend": "hf", "device": device},
+            # ACE-Step 1.5 signature from docs (backend default)
+            {"checkpoint_dir": str(lm_path.parent), "lm_model_path": lm_path.name, "device": device},
+            # Older/simple initialize signature
+            {"checkpoint_dir": str(lm_path), "device": device},
+            # Some variants accept direct lm_model_path only
+            {"lm_model_path": str(lm_path), "device": device},
+        ]
+        if device == "cuda":
+            init_attempts.append({"checkpoint_dir": str(lm_path.parent), "lm_model_path": lm_path.name, "backend": "vllm", "device": device})
+        for kwargs in init_attempts:
+            try:
+                llm.initialize(**kwargs)
+                init_ok = True
+                break
+            except Exception as init_err:
+                init_errors.append(f"{kwargs}: {init_err}")
+        if not init_ok:
+            raise RuntimeError("LLMHandler.initialize failed for all known signatures: " + " | ".join(init_errors))
+        def _run_format():
+            return format_sample(
+                llm_handler=llm,
+                caption=caption,
+                lyrics=lyrics,
+                user_metadata=user_metadata or None,
+                temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
+            )
+
+        result = _run_format()
+        # Some ACE-Step builds return "LLM not initialized" without throwing.
+        status_msg = str(getattr(result, "status_message", "") or "")
+        if "llm not initialized" in status_msg.lower():
+            retry_attempts = [
+                {"checkpoint_dir": str(lm_path.parent), "lm_model_path": lm_path.name, "backend": "pytorch", "device": device},
+                {"checkpoint_dir": str(lm_path.parent), "lm_model_path": lm_path.name, "backend": "transformers", "device": device},
+                {"checkpoint_dir": str(lm_path.parent), "lm_model_path": lm_path.name, "backend": "hf", "device": device},
+            ]
+            for kwargs in retry_attempts:
+                try:
+                    llm.initialize(**kwargs)
+                    result = _run_format()
+                    status_msg = str(getattr(result, "status_message", "") or "")
+                    if "llm not initialized" not in status_msg.lower():
+                        break
+                except Exception:
+                    continue
+        if result is None:
+            return None, "LM formatter returned no result."
+    except Exception as run_err:
+        reason = f"LM inference failed: {run_err}"
+        logging.warning("[API format] %s", reason)
+        return None, reason
+
+    success = bool(getattr(result, "success", True))
+    return {
+        "success": success,
+        "caption": getattr(result, "caption", None),
+        "lyrics": getattr(result, "lyrics", None),
+        "bpm": getattr(result, "bpm", None),
+        "duration": getattr(result, "duration", None),
+        "key_scale": getattr(result, "keyscale", None),
+        "language": getattr(result, "language", None),
+        "time_signature": getattr(result, "timesignature", None),
+        "status_message": getattr(result, "status_message", None),
+        "error": getattr(result, "error", None),
+    }, None
+
+
+def _normalize_lyrics_sections(lyrics: str) -> str:
+    text = (lyrics or "").strip()
+    if not text:
+        return text
+    lines = [ln.rstrip() for ln in text.splitlines()]
+    tag_re = re.compile(r"^\s*\[\s*([A-Za-z][A-Za-z0-9 _-]*?)\s*\]\s*$")
+    has_any_tag = any(tag_re.match(ln) for ln in lines)
+
+    def _clean_tag(tag: str) -> str:
+        low = re.sub(r"\s+", " ", tag.strip().lower())
+        mapping = {
+            "intro": "Intro",
+            "verse": "Verse",
+            "chorus": "Chorus",
+            "pre-chorus": "Pre-Chorus",
+            "post-chorus": "Post-Chorus",
+            "bridge": "Bridge",
+            "outro": "Outro",
+            "hook": "Hook",
+            "refrain": "Refrain",
+        }
+        for k, v in mapping.items():
+            if low == k or low.startswith(k + " "):
+                suffix = low[len(k):].strip()
+                return f"[{v}{(' ' + suffix) if suffix else ''}]"
+        return f"[{tag.strip().title()}]"
+
+    if has_any_tag:
+        out: list[str] = []
+        prev_blank = False
+        for ln in lines:
+            m = tag_re.match(ln)
+            if m:
+                out.append(_clean_tag(m.group(1)))
+                prev_blank = False
+                continue
+            if not ln.strip():
+                if not prev_blank:
+                    out.append("")
+                prev_blank = True
+                continue
+            out.append(ln.strip())
+            prev_blank = False
+        return "\n".join(out).strip()
+
+    # No structure tags: split paragraphs and apply a simple song structure.
+    paragraphs: list[str] = []
+    cur: list[str] = []
+    for ln in lines:
+        if ln.strip():
+            cur.append(ln.strip())
+        else:
+            if cur:
+                paragraphs.append("\n".join(cur))
+                cur = []
+    if cur:
+        paragraphs.append("\n".join(cur))
+    if not paragraphs:
+        return text
+
+    labels = ["[Verse 1]", "[Chorus]", "[Verse 2]", "[Chorus]", "[Bridge]", "[Chorus]", "[Outro]"]
+    out: list[str] = []
+    verse_n = 3
+    for i, block in enumerate(paragraphs):
+        if i < len(labels):
+            tag = labels[i]
+        else:
+            tag = f"[Verse {verse_n}]"
+            verse_n += 1
+        out.append(tag)
+        out.append(block)
+        out.append("")
+    return "\n".join(out).strip()
+
+
+def _infer_style_from_lyrics(lyrics: str) -> str:
+    t = (lyrics or "").lower()
+    if not t.strip():
+        return "emotional vocal song with clear verse-chorus structure"
+    if any(w in t for w in ("black days", "fate", "fear", "night", "blind", "fall")):
+        return "dark alternative rock, melancholic grunge vibe, expressive male vocals, dynamic verse-chorus structure"
+    if any(w in t for w in ("dance", "party", "club", "tonight", "bailando")):
+        return "upbeat pop dance track, catchy hooks, energetic vocal delivery"
+    if any(w in t for w in ("love", "heart", "tears", "alone", "broken")):
+        return "emotional pop rock ballad, introspective lyrics, wide dynamic chorus"
+    return "vocal alt-pop/rock song, emotional tone, clear verse-chorus form"
+
+
+def _expand_style_prompt(caption: str, lyrics: str) -> str:
+    cap = re.sub(r"\s+", " ", (caption or "").strip().strip(","))
+    lyr = (lyrics or "").lower()
+    low = f"{cap.lower()} {lyr}".strip()
+    if not cap:
+        return _infer_style_from_lyrics(lyrics)
+
+    def has_any(words: tuple[str, ...]) -> bool:
+        return any(w in low for w in words)
+
+    additions: list[str] = []
+
+    # Genre/style axis
+    has_genre = has_any((
+        "rock", "grunge", "metal", "pop", "dance", "edm", "house", "hip hop", "rap",
+        "r&b", "soul", "jazz", "blues", "folk", "country", "acoustic", "orchestral",
+        "cinematic", "ambient", "electronic", "alt", "alternative",
+    ))
+    if not has_genre:
+        if has_any(("black days", "fear", "fate", "night", "blind", "fall", "dark")):
+            additions.append("dark alternative rock with subtle grunge texture")
+        elif has_any(("dance", "party", "club", "tonight", "bailando")):
+            additions.append("upbeat pop dance production with modern electronic polish")
+        elif has_any(("love", "heart", "alone", "tears", "broken")):
+            additions.append("emotional pop-rock ballad character")
+        else:
+            additions.append("modern alt-pop/rock character")
+
+    # Mood axis
+    has_mood = has_any((
+        "dark", "melanch", "moody", "sad", "brooding", "uplift", "happy", "energetic",
+        "aggressive", "tender", "warm", "cinematic", "emotional", "introspective",
+    ))
+    if not has_mood:
+        if has_any(("black days", "fear", "fate", "night", "blind", "fall", "empty")):
+            additions.append("brooding, introspective mood")
+        elif has_any(("dance", "party", "club", "celebrate")):
+            additions.append("high-energy, hook-forward mood")
+        else:
+            additions.append("emotionally focused tone")
+
+    # Instrumentation axis
+    has_instruments = has_any((
+        "guitar", "bass", "drum", "synth", "piano", "string", "pad", "808", "perc",
+        "orchestra", "brass", "keys",
+    ))
+    if not has_instruments:
+        if has_any(("rock", "grunge", "alt", "alternative", "black days")):
+            additions.append("gritty electric guitars, driving bass, and punchy live drums")
+        elif has_any(("dance", "edm", "house", "electronic", "club")):
+            additions.append("tight electronic drums, deep bass, and bright synth hooks")
+        else:
+            additions.append("focused rhythm section with melodic lead layers")
+
+    # Arrangement / structure axis
+    has_structure = has_any(("verse", "chorus", "bridge", "drop", "build", "hook", "arrangement", "structure"))
+    if not has_structure:
+        additions.append("clear verse-chorus contrast with a stronger chorus lift")
+
+    # Vocal direction axis
+    has_vocal = has_any(("vocal", "voice", "sung", "singer", "male vocal", "female vocal", "duet", "harmony"))
+    if lyrics.strip() and not has_vocal:
+        additions.append("expressive lead vocals with natural phrasing")
+
+    # Keep repeated clicks mostly idempotent.
+    deduped = [a for a in additions if a.lower() not in cap.lower()]
+    if not deduped:
+        return cap
+    return f"{cap}, {', '.join(deduped)}"
+
+
+def _heuristic_format_input(data: dict, reason: str | None) -> dict:
+    mode = str(data.get("mode") or "general").strip().lower()
+    caption_in = (data.get("caption") or "").strip()
+    lyrics_in = (data.get("lyrics") or "").strip()
+
+    caption_out = caption_in
+    lyrics_out = lyrics_in
+
+    if mode in ("style", "general"):
+        if not caption_out and lyrics_in:
+            caption_out = _infer_style_from_lyrics(lyrics_in)
+        elif caption_out:
+            caption_out = _expand_style_prompt(caption_out, lyrics_in)
+
+    if mode in ("lyrics", "general") and lyrics_in:
+        lyrics_out = _normalize_lyrics_sections(lyrics_in)
+
+    return {
         "success": True,
-        "caption": data.get("caption"),
-        "lyrics": data.get("lyrics"),
+        "caption": caption_out,
+        "lyrics": lyrics_out,
         "bpm": data.get("bpm"),
         "duration": data.get("duration"),
         "key_scale": data.get("keyScale"),
+        "language": data.get("language"),
         "time_signature": data.get("timeSignature"),
-    })
+        "status_message": f"LM formatter unavailable. Reason: {reason or 'unknown'}. Applied local heuristic formatting.",
+    }
+
+
+@bp.route("/format", methods=["POST"])
+def format_input():
+    """POST /api/generate/format — format caption/lyrics via ACE-Step LM when available."""
+    data = request.get_json(silent=True) or {}
+    lm_payload, unavailable_reason = _format_with_lm(data)
+    if lm_payload is not None:
+        return jsonify(lm_payload)
+    return jsonify(_heuristic_format_input(data, unavailable_reason))

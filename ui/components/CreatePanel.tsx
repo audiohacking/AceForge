@@ -288,7 +288,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [isUploadingReference, setIsUploadingReference] = useState(false);
   const [isUploadingSource, setIsUploadingSource] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [isFormatting, setIsFormatting] = useState(false);
+  const [isFormattingStyle, setIsFormattingStyle] = useState(false);
+  const [isFormattingLyrics, setIsFormattingLyrics] = useState(false);
+  const referenceInputRef = useRef<HTMLInputElement>(null);
+  const sourceInputRef = useRef<HTMLInputElement>(null);
   const [showAudioModal, setShowAudioModal] = useState(false);
   const [audioModalTarget, setAudioModalTarget] = useState<'reference' | 'source' | 'cover_style'>('reference');
   const [tempAudioUrl, setTempAudioUrl] = useState('');
@@ -437,14 +440,37 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     }
   };
 
-  // Format handler - uses LLM to enhance style and auto-fill parameters
-  const handleFormat = async () => {
-    if (!token || !style.trim()) return;
-    setIsFormatting(true);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, target: 'reference' | 'source') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      void uploadAudio(file, target);
+    }
+    e.target.value = '';
+  };
+
+  const applyFormatMetadata = (result: {
+    bpm?: number;
+    duration?: number;
+    key_scale?: string;
+    time_signature?: string;
+    language?: string;
+  }) => {
+    if (result.bpm && result.bpm > 0) setBpm(result.bpm);
+    if (result.duration && result.duration > 0) setDuration(result.duration);
+    if (result.key_scale) setKeyScale(result.key_scale);
+    if (result.time_signature) setTimeSignature(result.time_signature);
+    if (result.language) setVocalLanguage(result.language);
+  };
+
+  // Style formatter: infer/enhance style prompt; if style is empty, it can infer from lyrics.
+  const handleFormatStyle = async () => {
+    if (!style.trim() && !lyrics.trim()) return;
+    setIsFormattingStyle(true);
     try {
       const result = await generateApi.formatInput({
+        mode: 'style',
         caption: style,
-        lyrics: lyrics,
+        lyrics: lyrics || undefined,
         bpm: bpm > 0 ? bpm : undefined,
         duration: duration > 0 ? duration : undefined,
         keyScale: keyScale || undefined,
@@ -452,27 +478,54 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         temperature: lmTemperature,
         topK: lmTopK > 0 ? lmTopK : undefined,
         topP: lmTopP,
-      }, token);
+      }, token || undefined);
 
       if (result.success) {
-        // Update fields with LLM-generated values
-        if (result.caption) setStyle(result.caption);
-        if (result.lyrics) setLyrics(result.lyrics);
-        if (result.bpm && result.bpm > 0) setBpm(result.bpm);
-        if (result.duration && result.duration > 0) setDuration(result.duration);
-        if (result.key_scale) setKeyScale(result.key_scale);
-        if (result.time_signature) setTimeSignature(result.time_signature);
-        if (result.language) setVocalLanguage(result.language);
+        if (result.caption?.trim()) setStyle(result.caption.trim());
+        applyFormatMetadata(result);
         setIsFormatCaption(true);
       } else {
-        console.error('Format failed:', result.error || result.status_message);
-        alert(result.error || result.status_message || 'Format failed. Make sure the LLM is initialized.');
+        console.error('Style format failed:', result.error || result.status_message);
+        alert(result.error || result.status_message || 'Style format failed. Make sure the LM is initialized.');
       }
     } catch (err) {
-      console.error('Format error:', err);
-      alert('Format failed. The LLM may not be available.');
+      console.error('Style format error:', err);
+      alert('Style format failed. The LM may not be available.');
     } finally {
-      setIsFormatting(false);
+      setIsFormattingStyle(false);
+    }
+  };
+
+  // Lyrics formatter: normalize / structure lyrics ([Verse], [Chorus], etc.).
+  const handleFormatLyrics = async () => {
+    if (!lyrics.trim()) return;
+    setIsFormattingLyrics(true);
+    try {
+      const result = await generateApi.formatInput({
+        mode: 'lyrics',
+        caption: style || undefined,
+        lyrics,
+        bpm: bpm > 0 ? bpm : undefined,
+        duration: duration > 0 ? duration : undefined,
+        keyScale: keyScale || undefined,
+        timeSignature: timeSignature || undefined,
+        temperature: lmTemperature,
+        topK: lmTopK > 0 ? lmTopK : undefined,
+        topP: lmTopP,
+      }, token || undefined);
+
+      if (result.success) {
+        if (result.lyrics?.trim()) setLyrics(result.lyrics.trim());
+        applyFormatMetadata(result);
+      } else {
+        console.error('Lyrics format failed:', result.error || result.status_message);
+        alert(result.error || result.status_message || 'Lyrics format failed. Make sure the LM is initialized.');
+      }
+    } catch (err) {
+      console.error('Lyrics format error:', err);
+      alert('Lyrics format failed. The LM may not be available.');
+    } finally {
+      setIsFormattingLyrics(false);
     }
   };
 
@@ -1709,12 +1762,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Genre, mood, instruments, vibe</p>
                 </div>
                 <button
-                  className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormatting ? 'text-pink-500 animate-pulse' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
-                  title="AI Format - Enhance style & auto-fill parameters"
-                  onClick={handleFormat}
-                  disabled={isFormatting || !style.trim()}
+                  className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormattingStyle ? 'text-pink-500 animate-pulse' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
+                  title="AI Style Format - infer or enhance style prompt"
+                  onClick={handleFormatStyle}
+                  disabled={isFormattingStyle || isFormattingLyrics || (!style.trim() && !lyrics.trim())}
                 >
-                  <Sparkles size={14} />
+                  {isFormattingStyle ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                 </button>
               </div>
               <div className="p-3 space-y-2">
@@ -1786,12 +1839,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                     {instrumental ? t('create.inputs.instrumental') : t('create.inputs.vocal_mode')}
                   </button>
                   <button
-                    className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormatting ? 'text-pink-500 animate-pulse' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
-                    title="AI Format - Enhance style & auto-fill parameters"
-                    onClick={handleFormat}
-                    disabled={isFormatting || !style.trim()}
+                    className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormattingLyrics ? 'text-pink-500 animate-pulse' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
+                    title="AI Lyrics Format - structure lyrics into sections"
+                    onClick={handleFormatLyrics}
+                    disabled={isFormattingStyle || isFormattingLyrics || !lyrics.trim()}
                   >
-                    <Sparkles size={14} />
+                    {isFormattingLyrics ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   </button>
                   <button
                     className="p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded text-zinc-500 hover:text-black dark:hover:text-white transition-colors"

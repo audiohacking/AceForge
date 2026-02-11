@@ -384,6 +384,7 @@ export const generateApi = {
   formatInput: (params: {
     caption: string;
     lyrics?: string;
+    mode?: 'style' | 'lyrics' | 'general';
     bpm?: number;
     duration?: number;
     keyScale?: string;
@@ -391,7 +392,7 @@ export const generateApi = {
     temperature?: number;
     topK?: number;
     topP?: number;
-  }, token: string): Promise<{
+  }, token?: string | null): Promise<{
     success: boolean;
     caption?: string;
     lyrics?: string;
@@ -402,7 +403,7 @@ export const generateApi = {
     time_signature?: string;
     status_message?: string;
     error?: string;
-  }> => api('/api/generate/format', { method: 'POST', body: params, token }),
+  }> => api('/api/generate/format', { method: 'POST', body: params, token: token || undefined }),
 };
 
 // Users API
