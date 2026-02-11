@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
 import { AlbumCover } from './AlbumCover';
+import { useTranslation } from 'react-i18next';
 
 interface SongListProps {
     songs: Song[];
@@ -23,19 +24,8 @@ interface SongListProps {
     onDelete?: (song: Song) => void;
 }
 
-// ... existing code ...
-
-
-
 // Define Filter Types
 type FilterType = 'liked' | 'public' | 'private' | 'generating';
-
-const FILTERS: { id: FilterType; label: string; icon: React.ReactNode }[] = [
-    { id: 'liked', label: 'Liked', icon: <ThumbsUp size={16} /> },
-    { id: 'public', label: 'Public', icon: <Globe size={16} /> },
-    { id: 'private', label: 'Private', icon: <Lock size={16} /> },
-    { id: 'generating', label: 'Generating', icon: <Loader2 size={16} /> },
-];
 
 export const SongList: React.FC<SongListProps> = ({
     songs,
@@ -53,11 +43,19 @@ export const SongList: React.FC<SongListProps> = ({
     onReusePrompt,
     onDelete
 }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilters, setActiveFilters] = useState<Set<FilterType>>(new Set());
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
+
+    const FILTERS: { id: FilterType; label: string; icon: React.ReactNode }[] = [
+        { id: 'liked', label: t('song_list.filter_liked'), icon: <ThumbsUp size={16} /> },
+        { id: 'public', label: t('song_list.filter_public'), icon: <Globe size={16} /> },
+        { id: 'private', label: t('song_list.filter_private'), icon: <Lock size={16} /> },
+        { id: 'generating', label: t('song_list.filter_generating'), icon: <Loader2 size={16} /> },
+    ];
 
     // Close filter dropdown when clicking outside
     useEffect(() => {
@@ -111,9 +109,9 @@ export const SongList: React.FC<SongListProps> = ({
                 {/* Header */}
                 <div className="flex flex-col gap-6 mb-8">
                     <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                        <span className="hover:text-black dark:hover:text-white cursor-pointer transition-colors">Workspaces</span>
+                        <span className="hover:text-black dark:hover:text-white cursor-pointer transition-colors">{t('song_list.workspaces')}</span>
                         <span className="text-zinc-400 dark:text-zinc-600">›</span>
-                        <span className="text-zinc-900 dark:text-white font-medium">My Workspace</span>
+                        <span className="text-zinc-900 dark:text-white font-medium">{t('song_list.my_workspace')}</span>
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -122,7 +120,7 @@ export const SongList: React.FC<SongListProps> = ({
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search your songs..."
+                                placeholder={t('song_list.search_placeholder')}
                                 className="w-full bg-zinc-100 dark:bg-[#121214] border border-zinc-200 dark:border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-zinc-400 dark:focus:border-white/20 placeholder-zinc-500 dark:placeholder-zinc-600 transition-colors"
                             />
                             <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-3 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
@@ -140,14 +138,14 @@ export const SongList: React.FC<SongListProps> = ({
                     `}
                             >
                                 <Filter size={14} fill={activeFilters.size > 0 ? "currentColor" : "none"} />
-                                <span>Filters {activeFilters.size > 0 && `(${activeFilters.size})`}</span>
+                                <span>{t('song_list.filters')} {activeFilters.size > 0 && `(${activeFilters.size})`}</span>
                             </button>
 
                             {/* Filter Dropdown */}
                             {isFilterOpen && (
                                 <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                                     <div className="px-3 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-                                        Refine By
+                                        {t('song_list.refine_by')}
                                     </div>
                                     {FILTERS.map(filter => (
                                         <button
@@ -185,12 +183,12 @@ export const SongList: React.FC<SongListProps> = ({
                             <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
                                 <Filter size={32} />
                             </div>
-                            <p className="font-medium">No songs match your filters.</p>
+                            <p className="font-medium">{t('song_list.no_matches')}</p>
                             <button
                                 onClick={() => { setActiveFilters(new Set()); setSearchQuery(''); }}
                                 className="text-pink-600 dark:text-pink-500 text-sm font-bold hover:underline"
                             >
-                                Clear filters
+                                {t('song_list.clear_filters')}
                             </button>
                         </div>
                     ) : (
@@ -256,6 +254,7 @@ const SongItem: React.FC<SongItemProps> = ({
     onReusePrompt,
     onDelete
 }) => {
+    const { t } = useTranslation();
     const [showDropdown, setShowDropdown] = useState(false);
     const [shareModalOpen, setShareModalOpen] = useState(false);
     const [imageError, setImageError] = useState(false);
@@ -289,7 +288,7 @@ const SongItem: React.FC<SongItemProps> = ({
                                 <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
                                     <Clock size={16} className="text-amber-400" />
                                 </div>
-                                <span className="text-[10px] font-medium text-amber-400">Queue #{song.queuePosition}</span>
+                                <span className="text-[10px] font-medium text-amber-400">{t('song_list.queued', { pos: song.queuePosition })}</span>
                             </>
                         ) : (
                             /* Generating - progress % and ETA */
@@ -336,7 +335,7 @@ const SongItem: React.FC<SongItemProps> = ({
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
                         <h3 className={`font-bold text-lg truncate ${isCurrent ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-900 dark:text-white'}`}>
-                            {song.title || (song.isGenerating ? (song.queuePosition ? "Queued..." : (song.generationPercent != null ? `Creating... ${Math.round(song.generationPercent)}%` : "Creating...")) : "Untitled")}
+                            {song.title || (song.isGenerating ? (song.queuePosition ? t('song_list.queued_text') : (song.generationPercent != null ? t('song_list.creating_percent', { percent: Math.round(song.generationPercent) }) : t('song_list.creating'))) : t('song_list.untitled'))}
                         </h3>
                         <span className="inline-flex items-center justify-center text-[9px] font-bold text-white bg-gradient-to-r from-pink-500 to-purple-500 px-1.5 py-0.5 rounded-sm shadow-sm">
                             v1.5
@@ -359,7 +358,7 @@ const SongItem: React.FC<SongItemProps> = ({
                                 {(song.creator?.[0] || 'U').toUpperCase()}
                             </div>
                             <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors hover:underline">
-                                {song.creator || 'Unknown'}
+                                {song.creator || t('song_list.unknown')}
                             </span>
                         </div>
                     </div>
@@ -391,7 +390,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
                             onClick={(e) => { e.stopPropagation(); setShareModalOpen(true); }}
-                            title="Share"
+                            title={t('song_list.share')}
                         >
                             <Share2 size={16} />
                         </button>
@@ -399,7 +398,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
                             onClick={(e) => { e.stopPropagation(); if (onOpenVideo) onOpenVideo(); }}
-                            title="Create Video"
+                            title={t('song_list.create_video')}
                         >
                             <Video size={16} />
                         </button>
@@ -407,7 +406,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors ml-auto"
                             onClick={(e) => { e.stopPropagation(); onAddToPlaylist(); }}
-                            title="Add to Playlist"
+                            title={t('song_list.add_to_playlist')}
                         >
                             <ListPlus size={16} />
                         </button>
@@ -416,7 +415,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors xl:hidden"
                             onClick={(e) => { e.stopPropagation(); if (onShowDetails) onShowDetails(); }}
-                            title="Song Details"
+                            title={t('song_list.song_details')}
                         >
                             <Info size={16} />
                         </button>
@@ -451,7 +450,7 @@ const SongItem: React.FC<SongItemProps> = ({
             <div className="text-xs font-mono text-zinc-500 dark:text-zinc-600 self-start pt-1">
                 {song.isGenerating ? (
                     <span className={song.queuePosition ? 'text-amber-500' : 'text-pink-500'}>
-                        {song.queuePosition ? `#${song.queuePosition}` : (song.generationPercent != null ? `${Math.round(song.generationPercent)}%` : 'Creating...')}
+                        {song.queuePosition ? `#${song.queuePosition}` : (song.generationPercent != null ? `${Math.round(song.generationPercent)}%` : t('song_list.creating'))}
                     </span>
                 ) : song.duration}
             </div>

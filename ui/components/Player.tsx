@@ -6,6 +6,7 @@ import { useResponsive } from '../context/ResponsiveContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
 import { AlbumCover } from './AlbumCover';
+import { useTranslation } from 'react-i18next';
 
 interface PlayerProps {
     currentSong: Song | null;
@@ -54,6 +55,7 @@ export const Player: React.FC<PlayerProps> = ({
     onAddToPlaylist,
     onDelete
 }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const { isMobile } = useResponsive();
     const progressBarRef = useRef<HTMLDivElement>(null);
@@ -83,7 +85,7 @@ export const Player: React.FC<PlayerProps> = ({
                     <div className="w-10 h-10 lg:w-12 lg:h-12 rounded bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
                         <Play size={20} className="text-zinc-400 dark:text-zinc-600" />
                     </div>
-                    <span className="text-sm font-medium">Select a song to play</span>
+                    <span className="text-sm font-medium">{t('player.select_song')}</span>
                 </div>
             </div>
         );
@@ -139,7 +141,7 @@ export const Player: React.FC<PlayerProps> = ({
                         >
                             <ChevronDown size={28} />
                         </button>
-                        <span className="text-xs text-zinc-500 dark:text-white/50 uppercase tracking-wider">Now Playing</span>
+                        <span className="text-xs text-zinc-500 dark:text-white/50 uppercase tracking-wider">{t('player.now_playing')}</span>
                         <div className="w-11" />
                     </div>
 
@@ -172,7 +174,7 @@ export const Player: React.FC<PlayerProps> = ({
                                     {currentSong.title}
                                 </h2>
                                 <p className="text-sm text-zinc-500 dark:text-white/60 truncate mt-1">
-                                    {currentSong.creator || 'Unknown Artist'}
+                                    {currentSong.creator || t('song_list.unknown_artist')}
                                 </p>
                             </div>
                             <button
@@ -273,7 +275,7 @@ export const Player: React.FC<PlayerProps> = ({
                         <button
                             onClick={handleDownload}
                             className="p-3 tap-highlight-none"
-                            title="Download Audio"
+                            title={t('player.download_audio')}
                         >
                             <Download size={20} />
                         </button>
@@ -341,7 +343,7 @@ export const Player: React.FC<PlayerProps> = ({
                                 {currentSong.title}
                             </h4>
                             <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                                {currentSong.creator || 'Unknown Artist'}
+                                {currentSong.creator || t('song_list.unknown_artist')}
                             </p>
                         </div>
                     </div>
@@ -387,16 +389,15 @@ export const Player: React.FC<PlayerProps> = ({
             >
                 {/* Header with close button */}
                 <div className="flex items-center justify-between px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    <button
-                        onClick={() => setIsFullscreen(false)}
-                        className="p-2 text-zinc-600 dark:text-white/70 hover:bg-zinc-200 dark:hover:bg-white/10 rounded-full transition-colors"
-                    >
-                        <ChevronDown size={28} />
-                    </button>
-                    <span className="text-sm text-zinc-500 dark:text-white/50 uppercase tracking-wider font-medium">Now Playing</span>
-                    <div className="w-11" />
-                </div>
-
+                                            <button
+                                            onClick={() => setIsFullscreen(false)}
+                                            className="p-2 text-zinc-600 dark:text-white/70 hover:bg-zinc-200 dark:hover:bg-white/10 rounded-full transition-colors"
+                                        >
+                                            <ChevronDown size={28} />
+                                        </button>
+                                        <span className="text-sm text-zinc-500 dark:text-white/50 uppercase tracking-wider font-medium">{t('player.now_playing')}</span>
+                                        <div className="w-11" />
+                                    </div>
                 {/* Main content area */}
                 <div className="flex-1 flex items-center justify-center px-8 py-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16 max-w-5xl w-full">
@@ -427,7 +428,7 @@ export const Player: React.FC<PlayerProps> = ({
                                     {currentSong.title}
                                 </h2>
                                 <p className="text-base lg:text-lg text-zinc-500 dark:text-white/60 truncate mt-2">
-                                    {currentSong.creator || 'Unknown Artist'}
+                                    {currentSong.creator || t('song_list.unknown_artist')}
                                 </p>
                             </div>
 
@@ -530,7 +531,7 @@ export const Player: React.FC<PlayerProps> = ({
                                 <button
                                     onClick={handleDownload}
                                     className="p-3 rounded-full hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
-                                    title="Download Audio"
+                                    title={t('player.download_audio')}
                                 >
                                     <Download size={20} />
                                 </button>
@@ -607,7 +608,7 @@ export const Player: React.FC<PlayerProps> = ({
                         >
                             {currentSong.title}
                         </h4>
-                        <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 truncate hover:underline cursor-pointer">{currentSong.creator || 'Unknown Artist'}</p>
+                        <p className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 truncate hover:underline cursor-pointer">{currentSong.creator || t('song_list.unknown_artist')}</p>
                     </div>
                     <button
                         onClick={onToggleLike}
@@ -693,7 +694,7 @@ export const Player: React.FC<PlayerProps> = ({
                     <button
                         onClick={handleDownload}
                         className="p-1.5 lg:p-2 hover:bg-zinc-100 dark:hover:bg-white/10 rounded-full transition-colors hidden lg:block"
-                        title="Download Audio"
+                        title={t('player.download_audio')}
                     >
                         <Download size={18} />
                     </button>

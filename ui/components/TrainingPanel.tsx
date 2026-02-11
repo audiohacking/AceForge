@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GraduationCap, Play, Pause, Square, RotateCw, Download, HelpCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toolsApi, preferencesApi } from '../services/api';
 
 const POLL_INTERVAL_MS = 2000;
@@ -10,6 +11,7 @@ interface TrainingPanelProps {
 }
 
 export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _onTracksUpdated }) => {
+  const { t } = useTranslation();
   const [datasetPath, setDatasetPath] = useState('');
   const [expName, setExpName] = useState('');
   const [loraConfigPath, setLoraConfigPath] = useState('');
@@ -32,7 +34,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showLoraHelp, setShowLoraHelp] = useState(false);
   const [datasetFiles, setDatasetFiles] = useState<FileList | null>(null);
-  const [statusText, setStatusText] = useState('Idle – no training in progress.');
+  const [statusText, setStatusText] = useState('');
   const [progress, setProgress] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -75,7 +77,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
         if (t?.max_epochs != null) setMaxEpochs(Number(t.max_epochs));
         if (t?.learning_rate != null) setLearningRate(Number(t.learning_rate));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -104,14 +106,14 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
             setAceDownloadProgress(p.fraction);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
       toolsApi.aceModelStatus()
         .then((r) => {
           setAceReady(r.ready);
           setAceState(r.state || '');
           setAceMessage(r.message || '');
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     poll();
     acePollRef.current = setInterval(poll, MODEL_POLL_MS);
@@ -137,7 +139,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
           else if (typeof s.current_epoch === 'number' && typeof s.max_epochs === 'number' && s.max_epochs > 0)
             setProgress(s.current_epoch / s.max_epochs);
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     poll();
     pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
@@ -154,14 +156,14 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
     if (!aceReady && aceState !== 'ready') {
       toolsApi.aceModelEnsure().then(() => {
         setAceState('downloading');
-        setAceMessage('Downloading ACE-Step model…');
-      }).catch((err) => setError(err instanceof Error ? err.message : 'Failed to start download.'));
+        setAceMessage(t('training.downloading_model'));
+      }).catch((err) => setError(err instanceof Error ? err.message : t('training.error_start_failed')));
       return;
     }
     const hasPath = datasetPath.trim().length > 0;
     const hasFiles = datasetFiles && datasetFiles.length > 0;
     if (!hasPath && !hasFiles) {
-      setError('Please select a dataset folder or enter a dataset path.');
+      setError(t('training.error_select_dataset'));
       return;
     }
     const formData = new FormData();
@@ -201,9 +203,9 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
       });
       setRunning(true);
       setPaused(false);
-      setStatusText('LoRA training is running… check the console for logs.');
+      setStatusText(t('training.training_running'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start training.');
+      setError(err instanceof Error ? err.message : t('training.error_start_failed'));
     }
   };
 
@@ -236,39 +238,48 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
   const startModelDownload = () => {
     toolsApi.aceModelEnsure().then(() => {
       setAceState('downloading');
-      setAceMessage('Downloading ACE-Step model from Hugging Face. This may take several minutes.');
+      setAceMessage(t('training.downloading_model'));
     }).catch((e) => setError(e.message));
   };
 
   const canStartTraining = aceReady === true && !running && aceState !== 'downloading';
   const showDownloadButton = aceReady === false && aceState !== 'downloading';
 
+  const getStatusDisplay = () => {
+    if (returncode != null && !running && !paused) {
+      return returncode === 0
+        ? (statusText || t('training.training_finished'))
+        : (statusText || t('training.training_error', { code: returncode }));
+    }
+    return statusText || t('training.idle');
+  };
+
   return (
     <div className="h-full flex flex-col overflow-y-auto p-4 text-zinc-800 dark:text-zinc-200">
       <div className="flex items-center gap-2 mb-4">
         <GraduationCap className="w-6 h-6 text-pink-500" />
-        <h2 className="text-lg font-semibold">Train Custom LoRA</h2>
+        <h2 className="text-lg font-semibold">{t('training.title')}</h2>
       </div>
       <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-        Run LoRA training on your dataset. Dataset folder must be under <code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">training_datasets</code>. Use Browse to select a folder. When training finishes, the LoRA is saved automatically and will appear in <strong>Create → LoRA adapter</strong> (click Refresh there if needed).
+        {t('training.description')}
       </p>
 
       {aceReady === false && aceState !== 'downloading' && (
         <div className="mb-4 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
-          <p className="font-medium mb-1">ACE-Step training model is not downloaded yet.</p>
-          <p className="mb-2">{aceMessage || 'Click "Download Training Model" to start the download. This is a large download (multiple GB).'}</p>
+          <p className="font-medium mb-1">{t('training.model_not_downloaded')}</p>
+          <p className="mb-2">{t('training.model_download_hint')}</p>
           <button
             type="button"
             onClick={startModelDownload}
             className="inline-flex items-center gap-2 rounded-lg bg-amber-500 text-white px-3 py-2 text-sm font-medium hover:bg-amber-600"
           >
-            <Download size={16} /> Download Training Model
+            <Download size={16} /> {t('training.download_training_model')}
           </button>
         </div>
       )}
       {aceState === 'downloading' && (
         <div className="mb-4 p-3 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm">
-          <p className="font-medium mb-2">Downloading ACE-Step model…</p>
+          <p className="font-medium mb-2">{t('training.downloading_model')}</p>
           <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
             <div
               className="h-full bg-pink-500 transition-all duration-300"
@@ -286,13 +297,13 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
 
       <form onSubmit={handleStart} className="flex flex-col gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Dataset</label>
+          <label className="block text-sm font-medium mb-1">{t('training.dataset')}</label>
           <div className="flex gap-2">
             <input
               type="text"
               value={datasetPath}
               onChange={(e) => { setDatasetPath(e.target.value); setDatasetFiles(null); }}
-              placeholder="Name of dataset subfolder"
+              placeholder={t('training.dataset_placeholder')}
               className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
             />
             <input
@@ -309,31 +320,31 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
               onClick={() => fileInputRef.current?.click()}
               className="rounded-lg border border-zinc-300 dark:border-zinc-600 px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
             >
-              Browse…
+              {t('training.browse')}
             </button>
           </div>
           {datasetFiles && (
-            <p className="text-xs text-zinc-500 mt-1">{datasetFiles.length} files selected</p>
+            <p className="text-xs text-zinc-500 mt-1">{t('training.files_selected', { count: datasetFiles.length })}</p>
           )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Experiment / adapter name</label>
+          <label className="block text-sm font-medium mb-1">{t('training.exp_name')}</label>
           <input
             type="text"
             value={expName}
             onChange={(e) => setExpName(e.target.value)}
-            placeholder="e.g. lofi_chiptunes_v1"
+            placeholder={t('training.exp_name_placeholder')}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           />
         </div>
 
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <label className="block text-sm font-medium">LoRA config (JSON)</label>
+            <label className="block text-sm font-medium">{t('training.lora_config')}</label>
             <button
               type="button"
-              title="What do these configs do?"
+              title={t('training.lora_config_help')}
               onClick={() => setShowLoraHelp(!showLoraHelp)}
               className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
             >
@@ -342,11 +353,11 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
           </div>
           {showLoraHelp && (
             <div className="mb-2 p-3 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 space-y-2">
-              <p><strong>Light / Medium / Heavy</strong> – How many LoRA parameters (light = subtle, heavy = more VRAM / overfit risk).</p>
-              <p><strong>base_layers</strong> – Main self-attention layers; good for gentle style.</p>
-              <p><strong>extended_attn</strong> – Base + cross-attention; stronger prompt control.</p>
-              <p><strong>transformer_deep / full_stack</strong> – Larger LoRAs; full_stack includes conditioning stack.</p>
-              <p><em>default_config.json</em> matches light_base_layers.</p>
+              <p><strong>{t('training.lora_help_light')}</strong></p>
+              <p><strong>{t('training.lora_help_base')}</strong></p>
+              <p><strong>{t('training.lora_help_extended')}</strong></p>
+              <p><strong>{t('training.lora_help_deep')}</strong></p>
+              <p><em>{t('training.lora_help_default')}</em></p>
             </div>
           )}
           <select
@@ -354,14 +365,14 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
             onChange={(e) => setLoraConfigPath(e.target.value)}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           >
-            {loadingConfigs ? <option>Loading…</option> : configs.map((c) => (
+            {loadingConfigs ? <option>{t('training.loading_configs')}</option> : configs.map((c) => (
               <option key={c.file} value={c.file}>{c.label}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Max steps</label>
+          <label className="block text-sm font-medium mb-1">{t('training.max_steps')}</label>
           <input
             type="number"
             min={100}
@@ -373,7 +384,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Max epochs</label>
+          <label className="block text-sm font-medium mb-1">{t('training.max_epochs')}</label>
           <input
             type="number"
             min={1}
@@ -384,7 +395,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Learning rate</label>
+          <label className="block text-sm font-medium mb-1">{t('training.learning_rate')}</label>
           <input
             type="number"
             step={1e-6}
@@ -395,7 +406,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Max clip seconds</label>
+          <label className="block text-sm font-medium mb-1">{t('training.max_clip_seconds')}</label>
           <input
             type="number"
             min={4}
@@ -407,7 +418,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">SSL loss weight</label>
+          <label className="block text-sm font-medium mb-1">{t('training.ssl_loss_weight')}</label>
           <input
             type="number"
             min={0}
@@ -417,7 +428,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
             onChange={(e) => setSslCoeff(Number(e.target.value))}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           />
-          <p className="text-xs text-zinc-500 mt-1">Set to 0 for pure instrumental / chiptune.</p>
+          <p className="text-xs text-zinc-500 mt-1">{t('training.ssl_note')}</p>
         </div>
 
         <label className="flex items-center gap-2 cursor-pointer">
@@ -426,11 +437,11 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
             checked={instrumentalOnly}
             onChange={(e) => setInstrumentalOnly(e.target.checked)}
           />
-          <span className="text-sm">Instrumental dataset (freeze lyric/speaker layers)</span>
+          <span className="text-sm">{t('training.instrumental_dataset')}</span>
         </label>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Save LoRA every N steps</label>
+          <label className="block text-sm font-medium mb-1">{t('training.save_lora_every')}</label>
           <input
             type="number"
             min={0}
@@ -446,25 +457,25 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="text-sm text-pink-500 hover:underline"
         >
-          {showAdvanced ? 'Hide' : 'Show'} advanced trainer settings
+          {showAdvanced ? t('training.hide_advanced') : t('training.show_advanced')}
         </button>
 
         {showAdvanced && (
           <>
             <div>
-              <label className="block text-sm font-medium mb-1">Precision</label>
+              <label className="block text-sm font-medium mb-1">{t('training.precision')}</label>
               <select
                 value={precision}
                 onChange={(e) => setPrecision(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
               >
-                <option value="32">32-bit (safe default)</option>
-                <option value="16-mixed">16-mixed (faster, less VRAM)</option>
-                <option value="bf16-mixed">bf16-mixed (modern GPUs only)</option>
+                <option value="32">{t('training.precision_32')}</option>
+                <option value="16-mixed">{t('training.precision_16')}</option>
+                <option value="bf16-mixed">{t('training.precision_bf16')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Grad accumulation</label>
+              <label className="block text-sm font-medium mb-1">{t('training.grad_accumulation')}</label>
               <input
                 type="number"
                 min={1}
@@ -474,7 +485,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Gradient clip (norm)</label>
+              <label className="block text-sm font-medium mb-1">{t('training.gradient_clip')}</label>
               <input
                 type="number"
                 min={0}
@@ -485,18 +496,18 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Clip algorithm</label>
+              <label className="block text-sm font-medium mb-1">{t('training.clip_algorithm')}</label>
               <select
                 value={gradientClipAlgorithm}
                 onChange={(e) => setGradientClipAlgorithm(e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
               >
-                <option value="norm">norm (recommended)</option>
-                <option value="value">value</option>
+                <option value="norm">{t('training.clip_norm')}</option>
+                <option value="value">{t('training.clip_value')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Reload DataLoader every N epochs</label>
+              <label className="block text-sm font-medium mb-1">{t('training.reload_dataloader')}</label>
               <input
                 type="number"
                 min={0}
@@ -506,17 +517,17 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Val check interval (batches, optional)</label>
+              <label className="block text-sm font-medium mb-1">{t('training.val_check_interval')}</label>
               <input
                 type="text"
                 value={valCheckInterval}
                 onChange={(e) => setValCheckInterval(e.target.value)}
-                placeholder="blank = default"
+                placeholder={t('training.val_check_placeholder')}
                 className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Devices (GPUs)</label>
+              <label className="block text-sm font-medium mb-1">{t('training.devices')}</label>
               <input
                 type="number"
                 min={1}
@@ -529,12 +540,8 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
         )}
 
         <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800 p-3 text-sm">
-          <span className="font-medium">Status: </span>
-          {returncode != null && !running && !paused
-            ? (returncode === 0
-                ? (statusText || 'LoRA training finished successfully.')
-                : (statusText || `Training finished with errors (return code ${returncode}). See trainer.log for details.`))
-            : statusText}
+          <span className="font-medium">{t('training.status')}: </span>
+          {getStatusDisplay()}
         </div>
         {(running || paused) && (
           <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
@@ -552,7 +559,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
               onClick={startModelDownload}
               className="inline-flex items-center gap-2 rounded-lg border border-amber-500 text-amber-600 dark:text-amber-400 px-4 py-2 text-sm font-medium hover:bg-amber-500/10"
             >
-              <Download size={16} /> Download Training Model
+              <Download size={16} /> {t('training.download_training_model')}
             </button>
           )}
           <button
@@ -560,21 +567,21 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
             disabled={!canStartTraining}
             className="inline-flex items-center gap-2 rounded-lg bg-pink-500 text-white px-4 py-2 text-sm font-medium hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Play size={16} /> Start Training
+            <Play size={16} /> {t('training.start_training')}
           </button>
           {running && (
             <>
               {paused ? (
                 <button type="button" onClick={handleResume} className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700">
-                  <RotateCw size={16} /> Resume
+                  <RotateCw size={16} /> {t('training.resume')}
                 </button>
               ) : (
                 <button type="button" onClick={handlePause} className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700">
-                  <Pause size={16} /> Pause
+                  <Pause size={16} /> {t('training.pause')}
                 </button>
               )}
               <button type="button" onClick={handleCancel} className="inline-flex items-center gap-2 rounded-lg border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 px-4 py-2 text-sm hover:bg-red-500/10">
-                <Square size={16} /> Cancel
+                <Square size={16} /> {t('training.cancel')}
               </button>
             </>
           )}

@@ -10,6 +10,7 @@ venv_test/
 venv/
 env/
 ENV/
+checkpoints/
 
 # ---- CDMF runtime-heavy / user data (DO NOT COMMIT) ----
 models/*

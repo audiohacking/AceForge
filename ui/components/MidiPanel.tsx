@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Music2, Download, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toolsApi, preferencesApi } from '../services/api';
 
 const POLL_INTERVAL_MS = 500;
@@ -10,6 +11,7 @@ interface MidiPanelProps {
 }
 
 export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
+  const { t } = useTranslation();
   const [inputFile, setInputFile] = useState<File | null>(null);
   const [outputFilename, setOutputFilename] = useState('');
   const [onsetThreshold, setOnsetThreshold] = useState(0.5);
@@ -51,7 +53,7 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
         if (m?.melodia_trick != null) setMelodiaTrick(Boolean(m.melodia_trick));
         if (m?.multiple_pitch_bends != null) setMultiplePitchBends(Boolean(m.multiple_pitch_bends));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -70,14 +72,14 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
           setModelState(r.state || '');
           setModelMessage(r.message || '');
         })
-        .catch(() => {});
+        .catch(() => { });
       toolsApi.getProgress()
         .then((p) => {
           if (p.stage === 'midi_model_download') {
             setModelDownloadProgress(p.fraction);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     poll();
     modelPollRef.current = setInterval(poll, MODEL_POLL_MS);
@@ -92,7 +94,7 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
       toolsApi.getProgress().then((p) => {
         setProgress(p.fraction);
         if (p.done || p.error) setLoading(false);
-      }).catch(() => {});
+      }).catch(() => { });
     }, POLL_INTERVAL_MS);
     return () => clearInterval(t);
   }, [loading]);
@@ -101,7 +103,7 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
     setError(null);
     toolsApi.midiModelEnsure().then(() => {
       setModelState('downloading');
-      setModelMessage('Downloading basic-pitch model (first use only). This may take several minutes.');
+      setModelMessage(t('midi.downloading_model'));
     }).catch((e) => setError(e.message));
   };
 
@@ -111,15 +113,15 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
     setSuccess(null);
     const out = outputFilename.trim();
     if (!out) {
-      setError('Output filename is required.');
+      setError(t('midi.error_filename_required'));
       return;
     }
     if (!inputFile) {
-      setError('Please select an input audio file.');
+      setError(t('midi.error_select_file'));
       return;
     }
     if (modelReady !== true || modelState === 'downloading') {
-      setError(modelState === 'downloading' ? 'Please wait for basic-pitch model download to finish.' : 'basic-pitch model is not ready. Click Download basic-pitch models first.');
+      setError(modelState === 'downloading' ? t('midi.error_wait_download') : t('midi.error_model_not_ready'));
       return;
     }
     const formData = new FormData();
@@ -140,7 +142,7 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
       if (prefs.output_dir) formData.set('out_dir', prefs.output_dir);
       const res = await toolsApi.midiGenerate(formData);
       if (res?.error) {
-        setError(res.message || 'MIDI generation failed.');
+        setError(res.message || t('midi.error_failed'));
         setLoading(false);
         return;
       }
@@ -154,11 +156,11 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
           multiple_pitch_bends: multiplePitchBends,
         },
       });
-      setSuccess(res?.message || 'MIDI saved to output directory.');
+      setSuccess(res?.message || t('midi.success_message'));
       setLoading(false);
       onTracksUpdated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'MIDI generation failed.');
+      setError(err instanceof Error ? err.message : t('midi.error_failed'));
       setLoading(false);
     }
   };
@@ -167,29 +169,29 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
     <div className="h-full flex flex-col overflow-y-auto p-4 text-zinc-800 dark:text-zinc-200">
       <div className="flex items-center gap-2 mb-4">
         <Music2 className="w-6 h-6 text-pink-500" />
-        <h2 className="text-lg font-semibold">Audio to MIDI</h2>
+        <h2 className="text-lg font-semibold">{t('midi.title')}</h2>
       </div>
       <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-        Convert audio to MIDI using basic-pitch. Upload an audio file and adjust detection parameters.
+        {t('midi.description')}
       </p>
 
       {modelReady === false && modelState !== 'downloading' && (
         <div className="mb-4 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
-          <p className="font-medium mb-1">basic-pitch model is not downloaded yet.</p>
-          <p className="mb-2">{modelMessage || 'Click "Download basic-pitch models" to download it (first use only).'}</p>
+          <p className="font-medium mb-1">{t('midi.model_not_downloaded')}</p>
+          <p className="mb-2">{t('midi.model_download_hint')}</p>
           <button
             type="button"
             onClick={handleDownloadModels}
             className="inline-flex items-center gap-1 rounded-lg bg-amber-500 text-white px-3 py-1.5 text-sm font-medium hover:bg-amber-600"
           >
-            <Download size={14} /> Download basic-pitch models
+            <Download size={14} /> {t('midi.download_model')}
           </button>
         </div>
       )}
       {modelState === 'downloading' && (
         <div className="mb-4 p-3 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm">
           <p className="font-medium mb-2 flex items-center gap-2">
-            <Loader2 size={16} className="animate-spin" /> Downloading basic-pitch model…
+            <Loader2 size={16} className="animate-spin" /> {t('midi.downloading_model')}
           </p>
           <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
             <div
@@ -208,7 +210,7 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Input Audio File</label>
+          <label className="block text-sm font-medium mb-1">{t('midi.input_audio')}</label>
           <input
             type="file"
             accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg"
@@ -219,19 +221,19 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Output filename (without extension)</label>
+          <label className="block text-sm font-medium mb-1">{t('midi.output_filename')}</label>
           <input
             type="text"
             value={outputFilename}
             onChange={(e) => setOutputFilename(e.target.value)}
-            placeholder="output_midi"
+            placeholder={t('midi.output_placeholder')}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Onset Threshold: {onsetThreshold}</label>
+          <label className="block text-sm font-medium mb-1">{t('midi.onset_threshold')}: {onsetThreshold}</label>
           <input
             type="range"
             min={0}
@@ -244,7 +246,7 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Frame Threshold: {frameThreshold}</label>
+          <label className="block text-sm font-medium mb-1">{t('midi.frame_threshold')}: {frameThreshold}</label>
           <input
             type="range"
             min={0}
@@ -257,7 +259,7 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Minimum Note Length (ms): {minimumNoteLengthMs}</label>
+          <label className="block text-sm font-medium mb-1">{t('midi.min_note_length')}: {minimumNoteLengthMs}</label>
           <input
             type="range"
             min={0}
@@ -270,31 +272,31 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Minimum Frequency (Hz, optional)</label>
+          <label className="block text-sm font-medium mb-1">{t('midi.min_frequency')}</label>
           <input
             type="number"
             min={0}
             value={minimumFrequency}
             onChange={(e) => setMinimumFrequency(e.target.value)}
-            placeholder="None"
+            placeholder={t('midi.frequency_placeholder')}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Maximum Frequency (Hz, optional)</label>
+          <label className="block text-sm font-medium mb-1">{t('midi.max_frequency')}</label>
           <input
             type="number"
             min={0}
             value={maximumFrequency}
             onChange={(e) => setMaximumFrequency(e.target.value)}
-            placeholder="None"
+            placeholder={t('midi.frequency_placeholder')}
             className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">MIDI Tempo (BPM): {midiTempo}</label>
+          <label className="block text-sm font-medium mb-1">{t('midi.midi_tempo')}: {midiTempo}</label>
           <input
             type="range"
             min={60}
@@ -311,7 +313,7 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
             checked={multiplePitchBends}
             onChange={(e) => setMultiplePitchBends(e.target.checked)}
           />
-          <span className="text-sm">Allow Multiple Pitch Bends</span>
+          <span className="text-sm">{t('midi.multiple_pitch_bends')}</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
@@ -320,7 +322,7 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
             checked={melodiaTrick}
             onChange={(e) => setMelodiaTrick(e.target.checked)}
           />
-          <span className="text-sm">Use Melodia Post-Processing</span>
+          <span className="text-sm">{t('midi.melodia_trick')}</span>
         </label>
 
         {loading && (
@@ -338,11 +340,11 @@ export const MidiPanel: React.FC<MidiPanelProps> = ({ onTracksUpdated }) => {
           className="rounded-lg bg-pink-500 text-white px-4 py-2 text-sm font-medium hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
         >
           {modelState === 'downloading' ? (
-            <><Loader2 size={16} className="animate-spin" /> Downloading basic-pitch models…</>
+            <><Loader2 size={16} className="animate-spin" /> {t('midi.downloading_model')}</>
           ) : loading ? (
-            <><Loader2 size={16} className="animate-spin" /> Generating MIDI…</>
+            <><Loader2 size={16} className="animate-spin" /> {t('midi.generating')}</>
           ) : (
-            'Generate MIDI'
+            t('midi.generate_midi')
           )}
         </button>
       </form>
